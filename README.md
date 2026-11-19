@@ -1,0 +1,169 @@
+# LOS Quad Sim
+
+A small quadcopter simulator for the browser, built so you can fly **line of sight**: you stand on the
+field and watch the quad, the way you would with a real one. Chase and FPV cameras are there too.
+It works with a USB gamepad or an RC transmitter in USB joystick mode, and with the keyboard.
+
+Vite, vanilla JavaScript and three.js. The flight model is written by hand (no physics engine) and
+runs at a fixed 500 Hz, independent of the frame rate.
+
+## Running it
+
+Needs Node 20.19+ (or 22.12+).
+
+```bash
+npm install
+```
+
+```bash
+npm run dev
+```
+
+Open the URL Vite prints (usually http://localhost:5173). Chromium/Chrome is the main target;
+Firefox works too.
+
+```bash
+npm run build
+```
+
+`dist/` is a static site with relative paths, so you can serve it from any folder on any static host
+(`npm run preview` serves it locally).
+
+Checks: `npm test` (Vitest unit tests) and `npm run lint` (ESLint).
+
+The repo has an `.npmrc` with `legacy-peer-deps=true`. Without it, some npm 10 versions crash
+resolving Vite's optional peer dependencies.
+
+## Controls
+
+| Action | Keyboard | Gamepad (standard layout, default) |
+| --- | --- | --- |
+| Throttle | W / S (stays where you leave it) | left stick up/down (mode 2) |
+| Yaw | A / D | left stick left/right |
+| Pitch / roll | arrow keys | right stick |
+| Arm / disarm | Space | A / Cross |
+| Camera mode (LOS → chase → FPV) | C | Y / Triangle |
+| Flight mode (angle ↔ acro) | M | X / Square |
+| Reset to the launch pad | R | B / Circle |
+| Put the pilot where the drone is | P | right bumper |
+| Settings | Esc | |
+| Debug overlay | ` (backquote) | |
+
+- **Arming** needs the throttle low (below 5%). A self-centring gamepad throttle rests at 50%,
+  so hold the stick down while you press arm.
+- You start in **angle mode** (self-levelling, max tilt 55° on the 5" preset). With "throttle stick
+  centers" on (default), mid throttle is hover in angle mode, which makes take-off and landing on the
+  pad easy. Acro mode always uses the full throttle range.
+- The front of the quad has **orange props and green LEDs**, the back has dark props and red LEDs.
+  In LOS you normally start with the tail towards you.
+- A hard impact (above about 7 m/s into a surface on the 5" preset) is a crash; press reset to go
+  back to the pad. Softer hits bounce.
+
+### Cameras
+
+- **LOS** (default): you stand 1.7 m tall a few metres behind the pad and look at the quad.
+  Auto-zoom narrows the field of view (70° to 25°) as it flies away, so it stays visible. When the
+  quad is far away a ring with its distance is drawn around it; if it gets off screen an arrow points
+  to it. Press P (or the mapped button) to walk to where the quad is.
+- **Chase**: behind and above, follows yaw with some lag but not roll or pitch.
+- **FPV**: on the quad, uptilt 25° and 110° horizontal FOV by default (both in Settings).
+
+## Controller setup and calibration
+
+The setup screen opens by itself the first time a controller is seen, and from
+**Settings → Controller setup…** at any time. Mappings are saved per device (by the browser's
+device id) in `localStorage`, so they survive a reload.
+
+1. Pick the **device** if more than one is connected.
+2. Standard gamepads: choose your **stick mode preset** (1–4) and click apply. That is usually all.
+3. RC transmitters and other joysticks: click **Guided stick setup**. For each stick it asks you to
+   move it through its full range a few times, then hold it at one end (throttle up, yaw right, pitch
+   forward, roll right) and press **Next** (or Enter). The axis that moved most is taken, its min/max
+   are recorded and invert is set from where you held it. The last step records the stick centres.
+4. Fine-tune per axis: axis number, invert, min/center/max (type a value or press "set" to take
+   the current stick position), and the deadzone (default 0.03).
+5. **Buttons and switches**: click assign next to an action, then press a button or flip a switch.
+   Radios often only expose switches as axes; an axis switch counts as on past 0.5 in the direction
+   you flipped it. Arm and flight mode on a switch follow the switch position (like on a real quad:
+   flip to arm, flip back to disarm), and the sim does not arm if the switch is already on when
+   the radio connects. Buttons toggle.
+6. Live bars show raw axes and buttons and the mapped stick values.
+
+### Throttle that centres vs one that doesn't
+
+Gamepad throttle sticks spring back to the middle; RC throttle sticks stay where you leave them.
+Both use the full calibrated range. **Settings → "Throttle stick centers: mid stick = hover"** maps
+mid throttle to hover thrust in angle mode (that suits a gamepad and is also handy on a radio while
+learning). Turn it off to get the plain linear range in angle mode as well.
+
+## Linux / Ubuntu notes
+
+- EdgeTX/OpenTX radios in **USB Joystick (HID)** mode show up as ordinary joysticks and work in
+  Chromium/Chrome and Firefox. Choose "USB Joystick" on the radio when you plug it in.
+- Browsers sometimes only report a controller after you press a button or move a stick on it.
+- **Snap-packaged browsers** on Ubuntu (Firefox and Chromium are snaps by default) may not see
+  joysticks because of the sandbox. Connect the joystick interface:
+
+  ```bash
+  sudo snap connect firefox:joystick
+  ```
+
+  ```bash
+  sudo snap connect chromium:joystick
+  ```
+
+  Restart the browser afterwards. If that does not help, use the `.deb` build of Google Chrome, or
+  a Flatpak or `.deb` build of Firefox/Chromium.
+- You can check what the browser sees with the debug overlay (`) or the raw bars in the setup screen.
+
+## Settings
+
+Esc opens the settings panel (the sim pauses while it is open):
+
+- Physics preset: Beginner, 5" freestyle, Tiny whoop. Choosing a preset also loads its rates.
+- Rates per axis, Betaflight "actual rates" style: center sensitivity, max rate (deg/s) and expo.
+  Defaults: roll/pitch 200/670, yaw 200/500.
+- Angle mode max tilt, throttle expo, hover-at-center.
+- FPV uptilt and FOV, LOS auto-zoom on/off, LOS marker on/off.
+- Low quality (no shadows, pixel ratio 1, about a third of the trees). Use this on weak iGPUs.
+- Motor sound volume (off by default).
+
+Everything is saved in `localStorage`. "Reset all settings" restores the defaults (controller
+mappings are kept; reset those per device in the setup screen).
+
+## Flight model
+
+`src/physics/quad.js`, constants in `src/config.js` (all tuning lives there).
+
+- Fixed 500 Hz steps with an accumulator; a frame is capped at 0.1 s so a long pause cannot cause a
+  spiral of death. Rendering interpolates between the last two physics states.
+- Thrust along the body up axis, `maxThrust = mass · g · thrustToWeight` (0.6 kg and 4:1 for the 5"),
+  with a short motor lag and optional throttle expo.
+- Drag is linear plus quadratic, with separate coefficients along the body up axis and in the body
+  plane, so the quad carves through turns instead of sliding.
+- Acro: sticks give a target rate through Betaflight actual rates; the actual angular velocity
+  follows with a first-order response (about 30 ms), standing in for a tuned PID loop.
+- Angle mode: sticks give a target tilt relative to the current heading; yaw stays rate based.
+- Collisions: the quad is a sphere against the heightfield ground, boxes and vertical cylinders
+  (gates, poles, trees, tower). A grounded quad with low thrust settles flat on its feet.
+
+Physics is frame-rate independent: a unit test runs the same flight at 24, 60 and 144 fps, and you
+can throttle rendering in the browser with `?fps=20` (for example `http://localhost:5173/?fps=20`)
+and see the quad fly the same.
+
+## Project layout
+
+```
+src/
+  main.js              bootstrap and main loop
+  config.js            all tuning constants and default settings
+  storage.js           localStorage helpers
+  cameras.js           LOS / chase / FPV
+  audio.js             optional Web Audio motor sound
+  physics/             quad.js (dynamics), rates.js, controls.js, stepper.js, colliders.js
+  input/               gamepad.js (polling, storage), mapping.js (pure mapping logic), keyboard.js, input.js
+  world/               terrain, sky, lights, trees, course (pad, gates, poles, flags, tower)
+  drone/model.js       quad mesh, prop animation, LEDs
+  ui/                  HUD, settings, calibration screen, toasts, LOS marker, debug overlay
+test/                  Vitest unit tests
+```

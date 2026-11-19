@@ -1,0 +1,146 @@
+// All tuning constants live here so the flight feel can be tweaked in one place.
+// Units: metres, seconds, kilograms, newtons, degrees (where noted).
+
+export const GRAVITY = 9.81;
+
+export const SIM = {
+  physicsHz: 500,
+  // Cap on frame time fed into the accumulator, avoids the spiral of death
+  // after a tab switch or a long GC pause.
+  maxFrameDt: 0.1,
+};
+
+// Betaflight "actual rates": center sensitivity and max rate in deg/s, expo 0..1.
+export const DEFAULT_RATES = {
+  roll: { center: 200, max: 670, expo: 0.0 },
+  pitch: { center: 200, max: 670, expo: 0.0 },
+  yaw: { center: 200, max: 500, expo: 0.0 },
+};
+
+// Physics presets. Selecting one in the settings panel also loads its rates.
+export const PRESETS = {
+  beginner: {
+    label: 'Beginner',
+    mass: 0.6,
+    thrustToWeight: 3.0,
+    motorTau: 0.03, // s, thrust spool-up lag
+    rateTau: 0.045, // s, angular velocity response (stands in for a tuned PID)
+    dragLinH: 0.12, // N per m/s, horizontal (body plane)
+    dragQuadH: 0.035, // N per (m/s)^2
+    dragLinV: 0.3, // along body up axis
+    dragQuadV: 0.06,
+    angleMaxTilt: 40, // deg
+    angleGain: 7, // 1/s, attitude error to rate
+    radius: 0.07, // collision sphere radius
+    crashSpeed: 6.5, // m/s normal impact speed that counts as a crash
+    restitution: 0.25,
+    modelScale: 1,
+    rates: {
+      roll: { center: 120, max: 400, expo: 0.2 },
+      pitch: { center: 120, max: 400, expo: 0.2 },
+      yaw: { center: 120, max: 300, expo: 0.1 },
+    },
+  },
+  freestyle5: {
+    label: '5" freestyle',
+    mass: 0.6,
+    thrustToWeight: 4.0,
+    motorTau: 0.02,
+    rateTau: 0.03,
+    dragLinH: 0.05,
+    dragQuadH: 0.022,
+    dragLinV: 0.2,
+    dragQuadV: 0.045,
+    angleMaxTilt: 55,
+    angleGain: 9,
+    radius: 0.07,
+    crashSpeed: 7,
+    restitution: 0.25,
+    modelScale: 1,
+    rates: DEFAULT_RATES,
+  },
+  whoop: {
+    label: 'Tiny whoop',
+    mass: 0.03,
+    thrustToWeight: 2.6,
+    motorTau: 0.025,
+    rateTau: 0.04,
+    dragLinH: 0.006,
+    dragQuadH: 0.0035,
+    dragLinV: 0.012,
+    dragQuadV: 0.006,
+    angleMaxTilt: 45,
+    angleGain: 8,
+    radius: 0.035,
+    crashSpeed: 9, // whoops bounce off almost everything
+    restitution: 0.35,
+    modelScale: 0.42,
+    rates: {
+      roll: { center: 180, max: 600, expo: 0.1 },
+      pitch: { center: 180, max: 600, expo: 0.1 },
+      yaw: { center: 160, max: 450, expo: 0.0 },
+    },
+  },
+};
+
+export const DEFAULT_PRESET = 'freestyle5';
+
+export const CONTACT = {
+  friction: 6, // 1/s, tangential velocity damping while touching a surface
+  restingSpeed: 0.5, // below this normal speed a contact does not bounce
+  levelRate: 6, // 1/s, how fast a grounded, idle quad settles flat
+};
+
+export const ARM = {
+  maxThrottle: 0.05, // raw throttle stick must be below this to arm
+};
+
+export const CAMERA = {
+  pilotEyeHeight: 1.7,
+  pilotStart: [0, 0, 6], // x, (ground), z: a few metres behind the launch pad
+  losLookSmoothing: 14, // 1/s
+  losZoomK: 2.5, // fov = 2*atan(K / distance), clamped below
+  losMinFov: 25,
+  losMaxFov: 70,
+  losFixedFov: 60,
+  losFarDistance: 45, // show the marker beyond this distance
+  chaseDistance: 2.6,
+  chaseHeight: 0.9,
+  chaseYawLag: 4, // 1/s
+  chasePosLag: 8, // 1/s
+  fpvUptilt: 25,
+  fpvFov: 110, // horizontal degrees
+};
+
+export const INPUT = {
+  deadzone: 0.03,
+  switchThreshold: 0.5,
+  keyboardRamp: 5, // stick units per second for keyboard sticks
+  keyboardThrottleRate: 0.6, // throttle units per second while W/S held
+};
+
+export const WORLD = {
+  size: 900, // terrain edge length
+  segments: 220,
+  flatRadius: 70, // perfectly flat around the pad
+  hillStart: 170, // hills begin to rise here
+  hillHeight: 38,
+  treeCountHigh: 700,
+  treeCountLow: 220,
+  seed: 1337,
+};
+
+export const DEFAULT_SETTINGS = {
+  preset: DEFAULT_PRESET,
+  rates: structuredClone(DEFAULT_RATES),
+  throttleExpo: 0.0,
+  hoverAtCenter: true, // angle mode: throttle stick center = hover
+  angleMaxTilt: PRESETS[DEFAULT_PRESET].angleMaxTilt,
+  fpvUptilt: CAMERA.fpvUptilt,
+  fpvFov: CAMERA.fpvFov,
+  losAutoZoom: true,
+  losMarker: true,
+  lowQuality: false,
+  volume: 0, // muted by default
+  showDebug: false,
+};
