@@ -82,8 +82,9 @@ optional peer dependencies.
 
 The drone is drawn 1.5× its real size by default so it is easier to see in LOS. Settings → "Drone
 size" changes this between 1× and 3×. Flight physics (mass, thrust, drag) keep the real size, but
-collisions follow the drawn size: the arms and props of a bigger drone hit the ground and obstacles
-too, and a hard prop strike is a crash.
+collisions follow the drawn size: spheres at the motors, around the prop discs and at both ends of
+the body make the arms and props of a bigger drone hit the ground and obstacles too, and a hard prop
+strike is a crash. (The sphere at the centre, which the drone rests on, keeps its real size.)
 
 ## Controller setup and calibration
 
@@ -199,7 +200,7 @@ Esc opens the settings panel (the sim pauses while it is open):
 - Stick command arming on/off.
 - FPV uptilt and FOV, FPV front props in view, LOS auto-zoom on/off, LOS marker on/off.
 - Drone size (drawn size and collisions, 1× to 3×, default 1.5×; flight physics unchanged).
-- Low quality (no shadows, no grass blades, pixel ratio 1, about a third of the trees). Use this on weak iGPUs.
+- Low quality (no shadows, pixel ratio 1, about a third of the trees). Use this on weak iGPUs.
 - Motor sound volume (off by default).
 
 Everything is saved in `localStorage`. "Reset all settings" restores the defaults (controller
@@ -219,12 +220,14 @@ mappings are kept; reset those per device in the setup screen).
   follows with a first-order response (about 30 ms), standing in for a tuned PID loop.
 - Angle mode: sticks give a target tilt relative to the current heading (a corner stick is capped at
   max tilt too); yaw stays rate based, about the world vertical so turning does not cost tilt.
-- Collisions: a sphere at the centre plus one at each motor (sized with the drawn drone) against the
+- Collisions: a sphere at the centre plus spheres at the motors, prop rims and body (sized with the
+  drawn drone; props flex, so they do not bounce) against the
   heightfield ground, boxes and vertical cylinders (gates, poles, trees, tower). A motor hit also
   makes the quad spin. A grounded quad with low thrust settles flat on its feet, and on the ground
   below take-off thrust the sticks do not spin it (like a real quad without air mode).
-- After a stick-command arm, yaw/pitch/roll are ignored until the sticks are back at centre, so the
-  sticks that are still in the corners do not make it spin.
+- After a stick-command arm, yaw/pitch/roll are ignored until the sticks are back at centre (or you
+  give take-off throttle), so the sticks that are still in the corners do not make it spin. The HUD
+  shows "ARMED · CENTER STICKS" meanwhile.
 
 Physics is frame-rate independent: a unit test runs the same flight at 24, 60 and 144 fps, and you
 can throttle rendering in the browser with `?fps=20` (for example `http://localhost:5173/?fps=20`)
@@ -242,8 +245,7 @@ src/
   physics/             quad.js (dynamics), rates.js, controls.js, stepper.js, colliders.js
   input/               gamepad.js (polling, storage), mapping.js (pure mapping logic), keyboard.js, input.js,
                        gesture.js (stick command arming)
-  world/               terrain, grass blades, distant hills, sky, lights, trees, course (pad, gates, poles,
-                       flags, tower)
+  world/               terrain, distant hills, sky, lights, trees, course (pad, gates, poles, flags, tower)
   drone/model.js       procedural quad (carbon frame, motors, props, battery, camera), prop animation, LEDs
   ui/                  HUD, settings, calibration screen + stick guide, toasts, LOS marker, debug overlay
 test/                  Vitest unit tests

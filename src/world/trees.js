@@ -114,6 +114,9 @@ export function createTrees(scene, collision, keepOutZones) {
   const canopies = VARIANTS.map((v) => {
     const count = trees.filter((t) => t.variant === VARIANTS.indexOf(v)).length;
     const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.9, flatShading: true, side: THREE.DoubleSide });
+    // Double-sided only so open cone bottoms are not see-through; shadows use
+    // the front faces (cheaper, no acne). Shadows do not sway with the wind.
+    mat.shadowSide = THREE.FrontSide;
     mat.onBeforeCompile = (shader) => {
       shader.uniforms.uWind = wind;
       shader.vertexShader = shader.vertexShader
@@ -184,6 +187,7 @@ export function createTrees(scene, collision, keepOutZones) {
     g.fillRect(0, 0, 64, 64);
     return new THREE.CanvasTexture(c);
   })();
+  const gn = new THREE.Vector3();
   const blobs = new THREE.InstancedMesh(
     blobGeo,
     new THREE.MeshBasicMaterial({ color: '#000', map: blobTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
@@ -193,8 +197,8 @@ export function createTrees(scene, collision, keepOutZones) {
   trees.forEach((t, i) => {
     const v = VARIANTS[t.variant];
     const r = v.canopyR * t.scale * 2.6;
-    p.set(t.x, terrainHeight(t.x, t.z) + 0.02, t.z);
-    q.identity();
+    p.set(t.x, terrainHeight(t.x, t.z) + 0.05, t.z);
+    q.setFromUnitVectors(up, collision.groundNormal(t.x, t.z, gn)); // lie on the slope
     s.set(r, 1, r);
     blobs.setMatrixAt(i, m.compose(p, q, s));
   });

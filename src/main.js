@@ -9,7 +9,6 @@ import { shapeThrottle } from './physics/controls.js';
 import { terrainHeight } from './world/terrain-height.js';
 import { createTerrain } from './world/terrain.js';
 import { createDistantLand } from './world/distant.js';
-import { createGrass } from './world/grass.js';
 import { createSky } from './world/sky.js';
 import { createLights } from './world/lights.js';
 import { createTrees } from './world/trees.js';
@@ -19,7 +18,7 @@ import { CameraRig, CAMERA_LABELS } from './cameras.js';
 import { GamepadManager } from './input/gamepad.js';
 import { Keyboard } from './input/keyboard.js';
 import { InputManager, shouldFailsafe } from './input/input.js';
-import { ArmGesture } from './input/gesture.js';
+import { ArmGesture, releaseStickLock } from './input/gesture.js';
 import { MotorSound } from './audio.js';
 import { Hud } from './ui/hud.js';
 import { Toasts } from './ui/toast.js';
@@ -51,7 +50,6 @@ const { sunDir } = createSky(renderer, scene);
 const lights = createLights(scene, sunDir);
 scene.add(createTerrain(renderer));
 createDistantLand(scene);
-const grass = createGrass(scene);
 
 const collision = new CollisionWorld(terrainHeight);
 const course = createCourse(scene, collision);
@@ -133,7 +131,6 @@ function applySettings(key) {
     lights.setShadows(!low);
     trees.setShadows(!low);
     trees.setCount(low ? WORLD.treeCountLow : WORLD.treeCountHigh);
-    grass.setVisible(!low);
     resize();
   }
   if (all || key === 'showDebug') debug.setVisible(settings.showDebug);
@@ -249,8 +246,10 @@ function frame(now) {
       }
     }
   } else {
+    // Gesture off (setting, switch arming, or paused): the lock must still be
+    // able to end, otherwise the pilot could fly without attitude control.
     armGesture.reset();
-    if (!quad.armed) armGesture.sticksLocked = false;
+    if (armGesture.sticksLocked && releaseStickLock(state, quad.armed)) armGesture.sticksLocked = false;
   }
   calibration.update();
 
@@ -290,7 +289,6 @@ function frame(now) {
   lights.follow(renderPos);
   course.update(elapsed);
   trees.update(elapsed);
-  grass.update(elapsed, camera.position);
   sound.update(paused ? 0 : quad.motor, quad.armed && !paused, rig.mode === 'fpv' ? 1 : camDist);
 
   if (rig.mode === 'los' && settings.losMarker) {
@@ -309,6 +307,7 @@ function frame(now) {
     source: state.source === 'gamepad' ? `🎮 ${state.gamepadId}` : '⌨ keyboard',
     paused,
     armProgress: armGesture.progress,
+    sticksLocked: armGesture.sticksLocked,
   });
   debug.update(dt, { steps, simTime: stepper.time, input: state, thrust: cmd.thrust, quad, pad });
 

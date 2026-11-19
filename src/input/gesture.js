@@ -19,6 +19,15 @@ export function inArmCorners({ throttle, yaw, pitch, roll }) {
 
 const centred = ({ yaw, pitch, roll }) => Math.max(Math.abs(yaw), Math.abs(pitch), Math.abs(roll)) < INPUT.stickArmRelease;
 
+/**
+ * Should the post-arm stick lock end? When the sticks are back at centre, when
+ * the pilot gives take-off throttle (a fallback for sticks that never read
+ * fully centred), or when the quad is no longer armed.
+ */
+export function releaseStickLock(sticks, armed) {
+  return !armed || centred(sticks) || sticks.throttle > INPUT.stickArmUnlockThrottle;
+}
+
 export class ArmGesture {
   constructor() {
     this.reset();
@@ -43,7 +52,7 @@ export class ArmGesture {
    * @returns {'arm'|'disarm'|null}
    */
   update(dt, sticks, { armed, grounded }) {
-    if (this.sticksLocked && (centred(sticks) || !armed)) this.sticksLocked = false;
+    if (this.sticksLocked && releaseStickLock(sticks, armed)) this.sticksLocked = false;
     if (!inArmCorners(sticks)) {
       this.reset();
       return null;

@@ -25,7 +25,7 @@ export function createDistantLand(scene) {
       const z = Math.sin(a) * r;
       let y;
       if (Math.abs(x) < half && Math.abs(z) < half) {
-        y = terrainHeight(x, z) - 1.5; // hidden under the playable terrain
+        y = terrainHeight(x, z) - 0.4; // just under the playable terrain (small seam at the edge)
       } else {
         const mountains = smoothstep(700, 2000, r) * (fbm(x / 320, z / 320, 4, WORLD.seed + 5) ** 1.8) * 260;
         y = terrainHeight(x, z) + mountains;

@@ -100,3 +100,13 @@ describe('stick lock after a stick-command arm', () => {
     expect(g.sticksLocked).toBe(false);
   });
 });
+
+describe('releasing the stick lock', () => {
+  it('ends on centred sticks, on take-off throttle, or when disarmed', async () => {
+    const { releaseStickLock } = await import('../src/input/gesture.js');
+    expect(releaseStickLock(outward, true)).toBe(false);
+    expect(releaseStickLock({ throttle: 0, yaw: 0.05, pitch: 0, roll: -0.05 }, true)).toBe(true);
+    expect(releaseStickLock({ ...outward, throttle: INPUT.stickArmUnlockThrottle + 0.05 }, true)).toBe(true);
+    expect(releaseStickLock(outward, false)).toBe(true);
+  });
+});

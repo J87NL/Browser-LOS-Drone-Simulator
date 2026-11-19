@@ -222,27 +222,69 @@ describe('Quad flight model', () => {
       maxBack = Math.max(maxBack, slow.vel.z);
     }
     expect(slow.crashed).toBeNull();
-    expect(maxBack).toBeGreaterThan(0.15); // it bounced back (part of the impact goes into spin)
-    // (Afterwards it may lean on the wall: in acro a knock leaves it tilted.)
+    // The props hit first; they flex rather than bounce, so it stops at the wall
+    // (a little rebound at most) and never passes into it.
+    expect(maxBack).toBeGreaterThanOrEqual(0);
+    expect(slow.pos.z).toBeGreaterThan(-2 + 0.1);
   });
 
-  it('a bigger drawn drone collides with its arms: banked low, the arm touches first', () => {
-    const big = (size) => {
+  it('a bigger drawn drone collides with its arms: banked low, a motor/prop probe touches first', () => {
+    const firstContact = (size) => {
       const q = new Quad(P);
       q.setDrawScale(size);
-      q.reset(new Vector3(0, 0.5, 0));
+      q.reset(new Vector3(0, 0.6, 0));
       q.quat.setFromAxisAngle(new Vector3(0, 0, 1), 0.7); // banked 40 deg
       q.vel.set(0, -1, 0);
+      q.lastContactProbe = null;
       const w = flat();
-      for (let i = 0; i < 600; i++) q.step(0.002, cmd(), w);
-      return q;
+      for (let i = 0; i < 600 && q.lastContactProbe === null; i++) q.step(0.002, cmd(), w);
+      return { probe: q.lastContactProbe, gap: q.pos.y - P.radius };
     };
-    const small = big(1);
-    const large = big(3);
-    expect(large.crashed).toBeNull();
-    // Both end up resting on the ground; while sinking the big one hit with its arm.
-    expect(large.lastImpact).toBeGreaterThan(0);
-    expect(small.crashed).toBeNull();
+    const large = firstContact(3);
+    expect(large.probe).toBeGreaterThanOrEqual(0); // not the centre sphere
+    expect(large.gap).toBeGreaterThan(0.1); // the centre is still well clear
+  });
+
+  it('a thin pole between the front props of a 3x drone is hit', () => {
+    const w = new CollisionWorld(() => -100);
+    w.addCylinder({ x: 0, z: -0.2, y0: 0, y1: 40, r: 0.06 });
+    const q = airborne();
+    q.setDrawScale(3);
+    q.vel.set(0, 0, -1);
+    let touched = false;
+    for (let i = 0; i < 300 && !touched; i++) {
+      q.step(0.002, cmd({ thrust: hover }), w);
+      touched = q.lastContactProbe !== null && q.lastContactProbe !== undefined;
+    }
+    expect(touched).toBe(true);
+    expect(q.pos.z).toBeGreaterThan(-0.2 + 0.06 + P.radius); // stopped before the centre reached it
+  });
+
+  it('a disarmed drop below crash speed ends upright for every preset and size', () => {
+    for (const preset of Object.values(PRESETS)) {
+      for (const size of [1, 1.5, 3]) {
+        for (const bank of [0.1, 0.2, 0.35]) {
+          const q = new Quad(preset);
+          q.setDrawScale(size);
+          q.reset(new Vector3(0, 0.6, 0));
+          q.quat.setFromAxisAngle(new Vector3(0, 0, 1), bank);
+          q.vel.set(0, -Math.min(4, preset.crashSpeed * 0.6), 0);
+          const w = flat();
+          for (let i = 0; i < 2500; i++) q.step(0.002, cmd(), w);
+          expect(q.crashed, `${preset.label} ${size}x bank ${bank}`).toBeNull();
+          expect(q.up().y, `${preset.label} ${size}x bank ${bank}`).toBeGreaterThan(0.95);
+        }
+      }
+    }
+  });
+
+  it('setParams keeps the drawn size for the probes', () => {
+    const q = new Quad(P);
+    q.setDrawScale(3);
+    q.setParams(PRESETS.whoop);
+    expect(q.drawScale).toBe(3);
+    const reach = Math.max(...q.probes.map((p) => Math.hypot(p.offset.x, p.offset.z) + p.radius));
+    expect(reach).toBeCloseTo((Math.hypot(0.078 + 0.042, 0.078) + 0.024) * PRESETS.whoop.modelScale * 3, 3);
   });
 
   it('a prop strike at speed is a crash for a big drone, even if the centre stays clear', () => {

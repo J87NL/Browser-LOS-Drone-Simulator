@@ -69,10 +69,20 @@ export class Quad {
     const p = this.params;
     const s = p.modelScale * droneSize;
     const lift = PROBES.feetDepth * s - p.radius;
-    const y = PROBES.motorY * s + lift;
     const m = PROBES.motor * s;
-    this.probes = [[m, m], [m, -m], [-m, m], [-m, -m]].map(([x, z]) => new Vector3(x, y, z));
-    this.probeRadius = PROBES.radius * s;
+    const probes = [];
+    const add = (x, y, z, r) => probes.push({ offset: new Vector3(x, y + lift, z), radius: r });
+    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      add(sx * m, PROBES.motorY * s, sz * m, PROBES.motorRadius * s);
+      // Four spheres around the prop rim, so the whole disc collides.
+      const rim = PROBES.propRim * s;
+      for (const [dx, dz] of [[rim, 0], [-rim, 0], [0, rim], [0, -rim]]) {
+        add(sx * m + dx, PROBES.propY * s, sz * m + dz, PROBES.propRimRadius * s);
+      }
+    }
+    add(0, PROBES.bodyY * s, PROBES.bodyZ * s, PROBES.bodyRadius * s);
+    add(0, PROBES.bodyY * s, -PROBES.bodyZ * s, PROBES.bodyRadius * s);
+    this.probes = probes;
     this.inertia = p.mass * (PROBES.inertiaK * s) ** 2;
   }
 
@@ -233,11 +243,12 @@ export class Quad {
       let r = null;
       if (k < 0) contacts = world.contacts(this.pos, p.radius);
       else {
-        r = _rW.copy(this.probes[k]).applyQuaternion(this.quat);
-        contacts = world.contacts(_probe.copy(this.pos).add(r), this.probeRadius);
+        r = _rW.copy(this.probes[k].offset).applyQuaternion(this.quat);
+        contacts = world.contacts(_probe.copy(this.pos).add(r), this.probes[k].radius);
       }
       for (const c of contacts) {
         if (this._resolveContact(c, r, dt)) return; // crashed
+        this.lastContactProbe = k; // -1 = centre sphere
         if (c.normal.y > 0.6) {
           this.grounded = true;
           groundNormal = _gn.copy(c.normal);
@@ -280,7 +291,8 @@ export class Quad {
         this.crash(impact);
         return true;
       }
-      const e = impact > CONTACT.restingSpeed ? p.restitution : 0;
+      // Props and arms flex and soak up a hit, so probe contacts do not bounce.
+      const e = !r && impact > CONTACT.restingSpeed ? p.restitution : 0;
       // Impulse with the effective mass at the contact point.
       let denom = 1 / p.mass;
       if (r) {
@@ -292,13 +304,14 @@ export class Quad {
       if (r) {
         // r x n is still in _tmp: angular impulse, world -> body.
         _qInv.copy(this.quat).invert();
-        this.omega.add(_tmp.multiplyScalar(j / this.inertia).applyQuaternion(_qInv));
+        this.omega.add(_tmp.multiplyScalar((j / this.inertia) * PROBES.spinTransfer).applyQuaternion(_qInv));
       }
     }
-    // Tangential friction.
+    // Tangential friction, and the spin it takes out by gripping the surface.
     const vn2 = this.vel.dot(n);
     _tan.copy(this.vel).addScaledVector(n, -vn2);
     this.vel.addScaledVector(_tan, -(1 - Math.exp(-CONTACT.friction * dt)));
+    this.omega.multiplyScalar(Math.exp(-CONTACT.contactSpinDamping * dt));
     return false;
   }
 

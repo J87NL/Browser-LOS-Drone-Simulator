@@ -39,10 +39,11 @@ export class Hud {
     if (cls !== undefined) el.dataset.state = cls;
   }
 
-  update({ armed, mode, camera, throttle, speed, altitude, crashed, source, paused, armProgress = 0 }) {
+  update({ armed, mode, camera, throttle, speed, altitude, crashed, source, paused, armProgress = 0, sticksLocked = false }) {
     // While a stick-command hold is in progress, show how far along it is.
     const holding = armProgress > 0 ? ` ${'▮'.repeat(Math.ceil(armProgress * 5)).padEnd(5, '▯')}` : '';
-    const label = armProgress > 0 ? (armed ? 'DISARMING' : 'ARMING') + holding : armed ? 'ARMED' : 'DISARMED';
+    let label = armProgress > 0 ? (armed ? 'DISARMING' : 'ARMING') + holding : armed ? 'ARMED' : 'DISARMED';
+    if (armed && sticksLocked && !(armProgress > 0)) label = 'ARMED · CENTER STICKS';
     this._set(this.armed, 'armed', label, armed ? 'on' : 'off');
     this._set(this.mode, 'mode', mode === 'acro' ? 'ACRO' : 'ANGLE', mode);
     this._set(this.cam, 'cam', CAMERA_LABELS[camera], camera);
