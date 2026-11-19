@@ -53,9 +53,11 @@ optional peer dependencies.
 - With a controller connected you can still use W/S: the throttle that moved last wins. A clear move
   of the controller throttle (not stick jitter) takes it back, continuing from its position.
 - **Stick command arming (DJI style):** hold both sticks in the bottom corners for 1.5 s, both
-  outward or both inward (throttle down, pitch back, yaw and roll to opposite sides). The same gesture
-  disarms, but only while the quad is on the ground. It works in every stick mode and can be turned
-  off in Settings; the hold time is `INPUT.stickArmHold` in `src/config.js`.
+  outward or both inward (throttle down, pitch back, yaw and roll to opposite sides). The HUD shows
+  the progress. The same gesture disarms, but only while the quad is on the ground. It works in every
+  stick mode and with round-gated gamepad sticks (push them into the diagonals). It is off while arming
+  is mapped to a switch, so the switch always matches the armed state. Turn it off in Settings; the
+  hold time and thresholds are in `INPUT` in `src/config.js`.
 - **Arming** needs the throttle low (below 5%). A self-centring gamepad throttle rests at 50%,
   so hold the stick down while you press arm.
 - You start in **angle mode** (self-levelling, max tilt 55° on the 5" preset). With "throttle stick
@@ -74,8 +76,9 @@ optional peer dependencies.
   to it. Press P (or the mapped button) to walk over: you then stand 5 m behind the quad, looking at its tail.
 - **Chase**: behind and above, follows yaw with some lag but not roll or pitch.
 - **FPV**: on the quad, uptilt 25° and 110° horizontal FOV by default (both in Settings). The option
-  "FPV: front props in view" mounts the camera further back, so the inner part of the front props
-  shows in the lower corners, as on many real builds.
+  "FPV: front props in view" mounts the camera lower and further back, so the inner part of the front
+  props shows in the lower corners, as on many real builds. That works at low to normal uptilt
+  (around 25°); at high uptilt the props drop out of the picture, as they would on a real quad.
 
 The drone is drawn 1.5× its real size by default so it is easier to see in LOS. Settings → "Drone
 size" changes this between 1× and 3×. It only changes the drawing: physics and collisions keep
@@ -192,7 +195,9 @@ Esc opens the settings panel (the sim pauses while it is open):
 - Rates per axis, Betaflight "actual rates" style: center sensitivity, max rate (deg/s) and expo.
   Defaults: roll/pitch 200/670, yaw 200/500.
 - Angle mode max tilt, throttle expo, hover-at-center.
-- FPV uptilt and FOV, LOS auto-zoom on/off, LOS marker on/off.
+- Stick command arming on/off.
+- FPV uptilt and FOV, FPV front props in view, LOS auto-zoom on/off, LOS marker on/off.
+- Drone size (drawing only, 1× to 3×, default 1.5×).
 - Low quality (no shadows, pixel ratio 1, about a third of the trees). Use this on weak iGPUs.
 - Motor sound volume (off by default).
 
@@ -230,9 +235,10 @@ src/
   cameras.js           LOS / chase / FPV
   audio.js             optional Web Audio motor sound
   physics/             quad.js (dynamics), rates.js, controls.js, stepper.js, colliders.js
-  input/               gamepad.js (polling, storage), mapping.js (pure mapping logic), keyboard.js, input.js
+  input/               gamepad.js (polling, storage), mapping.js (pure mapping logic), keyboard.js, input.js,
+                       gesture.js (stick command arming)
   world/               terrain, sky, lights, trees, course (pad, gates, poles, flags, tower)
   drone/model.js       quad mesh, prop animation, LEDs
-  ui/                  HUD, settings, calibration screen, toasts, LOS marker, debug overlay
+  ui/                  HUD, settings, calibration screen + stick guide, toasts, LOS marker, debug overlay
 test/                  Vitest unit tests
 ```

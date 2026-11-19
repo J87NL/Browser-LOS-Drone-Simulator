@@ -2,6 +2,9 @@
 // corners (both outward or both inward) to arm. The same gesture disarms, but
 // only on the ground. Works on functions (throttle, yaw, pitch, roll), so it
 // is the same physical corners in every stick mode.
+//
+// Thresholds are loose enough for round-gated gamepads, where a stick pushed
+// into a diagonal reads about 0.7 on each axis (and throttle about 0.12).
 import { INPUT } from '../config.js';
 
 const { stickArmHold: HOLD, stickArmThreshold: T, stickArmThrottle: THR } = INPUT;
@@ -16,8 +19,13 @@ export function inArmCorners({ throttle, yaw, pitch, roll }) {
 
 export class ArmGesture {
   constructor() {
+    this.reset();
+  }
+
+  reset() {
     this.held = 0;
     this.fired = false; // sticks must leave the corners before it can fire again
+    this.armedAtStart = false;
   }
 
   /** 0..1 progress of the current hold, for UI feedback. */
@@ -30,15 +38,19 @@ export class ArmGesture {
    */
   update(dt, sticks, { armed, grounded }) {
     if (!inArmCorners(sticks)) {
-      this.held = 0;
-      this.fired = false;
+      this.reset();
       return null;
     }
     if (this.fired) return null;
+    // A disarm hold only counts while on the ground (it cannot start in the
+    // air and complete on touchdown).
+    if (armed && !grounded) {
+      this.held = 0;
+      return null;
+    }
     this.held += dt;
     if (this.held < HOLD) return null;
     this.fired = true;
-    if (!armed) return 'arm';
-    return grounded ? 'disarm' : null;
+    return armed ? 'disarm' : 'arm';
   }
 }

@@ -70,6 +70,7 @@ export class CalibrationScreen {
 
   _selectDevice(id) {
     this.deviceId = id;
+    this.selectedMode = null;
     this._cancelCapture();
     const gp = this._pad();
     this.mapping = gp ? this.gamepads.getMapping(gp) : null;
@@ -226,8 +227,16 @@ export class CalibrationScreen {
 
     const devSel = h('select', { onchange: () => this._selectDevice(devSel.value) },
       pads.map((p) => h('option', { value: p.id, selected: p.id === this.deviceId, text: `${p.index}: ${p.id}` })));
-    const modeSel = h('select', { 'aria-label': 'Stick mode preset' },
-      [1, 2, 3, 4].map((m) => h('option', { value: m, selected: m === this.mapping.stickMode, text: `Mode ${m}` })));
+    // The selected mode (applied or not) is also what the guided setup uses to
+    // name the physical sticks.
+    const shownMode = this.selectedMode ?? this.mapping.stickMode ?? 2;
+    const modeSel = h('select', {
+      'aria-label': 'Stick mode preset',
+      onchange: () => {
+        this.selectedMode = Number(modeSel.value);
+        if (this.wizard) this.render();
+      },
+    }, [1, 2, 3, 4].map((m) => h('option', { value: m, selected: m === shownMode, text: `Mode ${m}` })));
     const applyPreset = () => {
       const m = Number(modeSel.value);
       this.mapping.stickMode = m;
@@ -245,7 +254,7 @@ export class CalibrationScreen {
         h('div', {}, h('b', { text: `Step ${this.wizard.i + 1}/${this.wizard.steps.length}: ${title}` })),
         step === 'center'
           ? h('p', { text: 'Let go of the yaw, pitch and roll sticks so they rest at center (throttle can stay anywhere).' })
-          : stickGuide(step, this.mapping.stickMode ?? 2),
+          : stickGuide(step, shownMode),
         h('div', { class: 'muted', text: 'Not sure which stick it is? Watch the raw input bars at the bottom of this screen: the bar that moves is the axis that will be used. Press Next (or Enter) when done.' }),
         this.wizard.message && h('div', { class: 'warn', text: this.wizard.message }),
         h('div', { class: 'row' },

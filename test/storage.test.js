@@ -25,6 +25,11 @@ describe('settings storage', () => {
     expect(s.angleMaxTilt).toBe(80);
     expect(s.volume).toBe(1);
     expect(mergeSettings({ droneSize: 10 }).droneSize).toBe(3);
+    expect(mergeSettings({ droneSize: 0.2 }).droneSize).toBe(1);
+    expect(mergeSettings({ droneSize: 'big' }).droneSize).toBe(DEFAULT_SETTINGS.droneSize);
+    expect(mergeSettings({ stickArm: 'no', fpvPropsInView: 1 })).toMatchObject({
+      stickArm: DEFAULT_SETTINGS.stickArm, fpvPropsInView: DEFAULT_SETTINGS.fpvPropsInView,
+    });
     expect(s.rates.yaw.center).toBe(0);
     expect(s.rates.yaw.expo).toBe(1);
   });

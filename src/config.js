@@ -124,7 +124,7 @@ export const CAMERA = {
   chasePosLag: 8, // 1/s
   fpvUptilt: 25,
   fpvMount: [0, 0.02, -0.05], // model coords: above the front of the frame
-  fpvMountPropsInView: [0, -0.005, -0.02], // further back: front props show in the lower corners
+  fpvMountPropsInView: [0, -0.01, -0.042], // lower, just in front of the battery: front props show in the lower corners
   fpvFov: 110, // horizontal degrees
 };
 
@@ -132,8 +132,8 @@ export const INPUT = {
   deadzone: 0.03,
   switchThreshold: 0.5,
   stickArmHold: 1.5, // s, hold both sticks in the bottom corners to arm (DJI style)
-  stickArmThreshold: 0.85, // how far into the corner yaw/pitch/roll must be
-  stickArmThrottle: 0.05, // throttle must be below this
+  stickArmThreshold: 0.6, // yaw/pitch/roll past this (round gamepad gates reach ~0.7 diagonally)
+  stickArmThrottle: 0.2, // throttle below this (a round-gated diagonal reads ~0.12)
   padTakeover: 0.08, // pad throttle must move this far to take over from the keyboard
   keyboardRamp: 5, // stick units per second for keyboard sticks
   keyboardThrottleRate: 0.6, // throttle units per second while W/S held

@@ -1,6 +1,6 @@
 // Bootstrap and main loop.
 import * as THREE from 'three';
-import { SIM, PRESETS, ARM, CAMERA, WORLD } from './config.js';
+import { SIM, PRESETS, ARM, CAMERA, WORLD, INPUT } from './config.js';
 import { loadSettings, saveSettings } from './storage.js';
 import { FixedStepper } from './physics/stepper.js';
 import { Quad } from './physics/quad.js';
@@ -12,7 +12,7 @@ import { createSky } from './world/sky.js';
 import { createLights } from './world/lights.js';
 import { createTrees } from './world/trees.js';
 import { createCourse, PAD } from './world/course.js';
-import { createDroneModel } from './drone/model.js';
+import { createDroneModel, modelLift } from './drone/model.js';
 import { CameraRig, CAMERA_LABELS } from './cameras.js';
 import { GamepadManager } from './input/gamepad.js';
 import { Keyboard } from './input/keyboard.js';
@@ -143,10 +143,10 @@ function resetDrone() {
   keyboard.usedThrottle = false;
 }
 
-function tryArm(rawThrottle) {
+function tryArm(rawThrottle, maxThrottle = ARM.maxThrottle) {
   if (quad.crashed) return toasts.show('Crashed: reset first (R)');
   if (quad.armed) return;
-  if (rawThrottle > ARM.maxThrottle) return toasts.show('Throttle must be low to arm');
+  if (rawThrottle > maxThrottle) return toasts.show('Throttle must be low to arm');
   quad.armed = true;
 }
 
@@ -158,6 +158,9 @@ function handleEvent(ev, state) {
       break;
     case 'arm':
       tryArm(state.throttle);
+      break;
+    case 'gestureArm': // stick command: its own (looser) throttle limit, see gesture.js
+      tryArm(state.throttle, INPUT.stickArmThrottle);
       break;
     case 'disarm':
       quad.armed = false;
@@ -208,7 +211,6 @@ camera.aspect = innerWidth / innerHeight;
 // --- Loop ------------------------------------------------------------------------------
 const renderPos = new THREE.Vector3();
 const renderQuat = new THREE.Quaternion();
-const _droneUp = new THREE.Vector3();
 const cmd = { thrust: 0, roll: 0, pitch: 0, yaw: 0, mode: 'angle', rates: settings.rates, angleMaxTilt: settings.angleMaxTilt };
 let last = performance.now();
 let lastRender = 0;
@@ -226,13 +228,16 @@ function frame(now) {
   input.enabled = !paused;
   const { state, events, pad } = input.update(dt);
   for (const ev of events) handleEvent(ev, state);
-  if (settings.stickArm && !paused) {
+  // Stick command arming. Off while arming sits on a switch, so the switch
+  // position always matches the armed state (like Betaflight).
+  const armOnSwitch = pad?.mapping.buttons.arm?.type === 'axis';
+  if (settings.stickArm && !paused && !armOnSwitch) {
     const g = armGesture.update(dt, state, { armed: quad.armed, grounded: quad.grounded });
     if (g) {
-      handleEvent(g, state);
+      handleEvent(g === 'arm' ? 'gestureArm' : 'disarm', state);
       if (quad.armed === (g === 'arm')) toasts.show(g === 'arm' ? 'Armed (stick command)' : 'Disarmed (stick command)', 1500);
     }
-  }
+  } else armGesture.reset();
   calibration.update();
 
   cmd.mode = flightMode;
@@ -256,15 +261,14 @@ function frame(now) {
   quad.renderPose(alpha, renderPos, renderQuat);
 
   // Visuals
-  // Visual size setting: scale the model and lift it along its own up axis
-  // so its feet still sit on the collision sphere's bottom (no sinking in).
+  // Visual size setting: scale the model and lift it so its feet sit on the
+  // bottom of the collision sphere (world up, so an upside-down quad does
+  // not sink into the ground either).
   const scale = preset().modelScale * settings.droneSize;
   drone.root.scale.setScalar(scale);
   drone.root.quaternion.copy(renderQuat);
-  drone.root.position.copy(renderPos).addScaledVector(
-    _droneUp.set(0, 1, 0).applyQuaternion(renderQuat),
-    preset().radius * (settings.droneSize - 1),
-  );
+  drone.root.position.copy(renderPos);
+  drone.root.position.y += modelLift(preset(), settings.droneSize);
   rig.update(dt, renderPos, renderQuat, quad.heading, settings, scale, preset().modelScale, drone.root.position);
   const camDist = camera.position.distanceTo(renderPos);
   drone.update(quad.motor, paused ? 0 : dt, camDist, rig.mode === 'fpv');
@@ -287,6 +291,7 @@ function frame(now) {
     crashed: quad.crashed,
     source: state.source === 'gamepad' ? `🎮 ${state.gamepadId}` : '⌨ keyboard',
     paused,
+    armProgress: armGesture.progress,
   });
   debug.update(dt, { steps, simTime: stepper.time, input: state, thrust: cmd.thrust, quad, pad });
 

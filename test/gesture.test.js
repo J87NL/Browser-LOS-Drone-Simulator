@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ArmGesture, inArmCorners } from '../src/input/gesture.js';
 import { INPUT } from '../src/config.js';
+import { mapGamepad, defaultMapping } from '../src/input/mapping.js';
 
 const outward = { throttle: 0, yaw: -1, pitch: -1, roll: 1 };
 const inward = { throttle: 0, yaw: 1, pitch: -1, roll: -1 };
@@ -33,6 +34,38 @@ describe('stick-command arming', () => {
     expect(hold(g, inward, 5, { armed: true, grounded: true })).toBeNull();
     g.update(0.02, { throttle: 0, yaw: 0, pitch: 0, roll: 0 }, ctx);
     expect(hold(g, inward, INPUT.stickArmHold + 0.1, { armed: true, grounded: true })).toBe('disarm');
+  });
+
+  it('works with round-gated gamepad sticks pushed into the diagonals (mode 2)', () => {
+    const d = Math.SQRT1_2; // a round gate reaches ~0.71 per axis on the diagonal
+    const gp = { axes: [-d, d, d, d], buttons: [] }; // left: down-left, right: down-right
+    const sticks = mapGamepad(gp, defaultMapping(true, 2));
+    expect(inArmCorners(sticks)).toBe(true);
+    const inwardGp = { axes: [d, d, -d, d], buttons: [] };
+    expect(inArmCorners(mapGamepad(inwardGp, defaultMapping(true, 2)))).toBe(true);
+  });
+
+  it('boundaries: throttle and stick thresholds', () => {
+    const T = INPUT.stickArmThreshold;
+    expect(inArmCorners({ ...outward, throttle: INPUT.stickArmThrottle })).toBe(true);
+    expect(inArmCorners({ ...outward, throttle: INPUT.stickArmThrottle + 0.01 })).toBe(false);
+    expect(inArmCorners({ throttle: 0, yaw: -T, pitch: -T, roll: T })).toBe(true);
+    expect(inArmCorners({ throttle: 0, yaw: -T + 0.01, pitch: -T, roll: T })).toBe(false);
+  });
+
+  it('a disarm hold started in the air does not complete on touchdown', () => {
+    const g = new ArmGesture();
+    hold(g, outward, 1.4, { armed: true, grounded: false });
+    expect(hold(g, outward, 0.2, { armed: true, grounded: true })).toBeNull();
+    expect(hold(g, outward, INPUT.stickArmHold, { armed: true, grounded: true })).toBe('disarm');
+  });
+
+  it('reset() drops a partial hold (used while paused)', () => {
+    const g = new ArmGesture();
+    hold(g, outward, INPUT.stickArmHold - 0.1, { armed: false, grounded: true });
+    g.reset();
+    expect(hold(g, outward, 0.2, { armed: false, grounded: true })).toBeNull();
+    expect(g.progress).toBeGreaterThan(0);
   });
 
   it('never disarms in the air', () => {

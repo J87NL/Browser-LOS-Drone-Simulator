@@ -5,6 +5,17 @@ import * as THREE from 'three';
 
 const MOTOR = 0.078; // motor offset from centre on X and Z (220 mm wheelbase)
 const PROP_R = 0.0635;
+// Depth of the feet below the model origin, in model units: body offset
+// (-0.045) plus foot length (0.025).
+export const FEET_DEPTH = 0.07;
+
+/**
+ * How far to raise the drawn model above the physics centre so its feet rest
+ * on the bottom of the collision sphere, for any preset and drawn size.
+ */
+export function modelLift(preset, droneSize) {
+  return FEET_DEPTH * preset.modelScale * droneSize - preset.radius;
+}
 const FRONT_COLOR = '#ff7a1a';
 const REAR_COLOR = '#23272d';
 const FRONT_LED = new THREE.Color('#2dff7a');

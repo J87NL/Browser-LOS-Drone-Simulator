@@ -104,14 +104,15 @@ export class CameraRig {
       fov = CAMERA.chaseFov;
     } else {
       // Camera mount in model coordinates (scaled with the drawn model). With
-      // "props in view" it sits further back between the front arms.
+      // "props in view" it sits lower and further back, just in front of the
+      // battery, so the inner part of the front props shows at low uptilt.
       const mount = settings.fpvPropsInView ? CAMERA.fpvMountPropsInView : CAMERA.fpvMount;
       _v.fromArray(mount).multiplyScalar(scale).applyQuaternion(quat);
       cam.position.copy(modelPos ?? pos).add(_v);
       _q.setFromAxisAngle(X, THREE.MathUtils.degToRad(settings.fpvUptilt));
       cam.quaternion.copy(quat).multiply(_q);
       fov = horizontalToVerticalFov(settings.fpvFov, cam.aspect);
-      near = 0.01;
+      near = Math.min(0.02, 0.025 * scale); // close enough for the props, not wasteful on depth precision
     }
     this.fov = fov;
     if (cam.fov !== fov || cam.near !== near) {
