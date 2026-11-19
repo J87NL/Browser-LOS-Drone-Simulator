@@ -126,33 +126,51 @@ learning). Turn it off to get the plain linear range in angle mode as well.
 
 ## Deploying
 
-Run `npm run build`, then point the web server's document root at `public/`, like a Laravel app.
-`src/`, `node_modules/` and `.git/` stay outside the document root. Nothing else is needed: no
-rewrites, no Node on the server. `public/` is generated (and git-ignored); every build replaces it.
+`npm run build` writes the site to `public/` (`index.html` plus content-hashed files in `assets/`).
+Point the web server's document root at `public/`, like a Laravel app: `src/`, `node_modules/` and
+`.git/` stay outside it. No rewrites and no Node at runtime are needed.
 
-Apache:
+- Build where Node is available (your machine or CI), then copy `public/` to the server, for
+  example `rsync -a --delete public/ server:/var/www/browser-los-drone-simulator/public/`. If you
+  build on a live server instead, build into another folder (`npx vite build --outDir /tmp/drone-build`)
+  and swap it in, because each build first empties `public/`.
+- `public/` is generated and git-ignored. Do not put files there by hand (a favicon, `robots.txt`):
+  the next build deletes them. If static files are ever needed, put them in a `static/` folder and
+  set `publicDir: 'static'` in `vite.config.js`.
+
+**Serve it over HTTPS.** The Gamepad API is specified for secure contexts only, so a browser may
+refuse controllers on a plain `http://` domain. `localhost` and `*.localhost` count as secure. The
+keyboard works either way.
+
+Apache, local (Chrome and Firefox resolve `*.localhost` to your machine and treat it as secure):
 
 ```apache
 <VirtualHost *:80>
-    ServerName drone.local
+    ServerName drone.localhost
     DocumentRoot /var/www/browser-los-drone-simulator/public
+    <Directory /var/www/browser-los-drone-simulator/public>
+        Options -Indexes
+        Require all granted
+    </Directory>
 </VirtualHost>
 ```
 
-nginx:
+nginx on a server, with a certificate from e.g. `certbot --nginx`:
 
 ```nginx
 server {
+    listen 443 ssl;
     server_name drone.example.com;
+    ssl_certificate     /etc/letsencrypt/live/drone.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/drone.example.com/privkey.pem;
+
     root /var/www/browser-los-drone-simulator/public;
     index index.html;
-    location /assets/ { expires 1y; } # file names are content-hashed
+
+    location = /index.html { add_header Cache-Control "no-cache"; }
+    location /assets/ { add_header Cache-Control "public, max-age=31536000, immutable"; }
 }
 ```
-
-**Serve it over HTTPS.** The Gamepad API is specified for secure contexts only, so a browser may
-refuse controllers on a plain `http://` domain (`localhost` counts as secure). The keyboard works
-either way.
 
 ## Settings
 
