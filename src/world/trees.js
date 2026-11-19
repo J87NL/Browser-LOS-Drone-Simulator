@@ -69,9 +69,13 @@ const poplar = () => clusterGeometry([
 
 const VARIANTS = [
   // canopy geometry, canopy colour, trunk height, trunk radius, collider radius/top/bottom (in unit tree space)
-  { name: 'conifer', geo: coniferGeometry, color: '#2f5d34', trunkH: 1.2, trunkR: 0.16, canopyR: 1.1, canopyY0: 0.6, canopyY1: 4.5 },
-  { name: 'broadleaf', geo: broadleaf, color: '#4f7f35', trunkH: 2.3, trunkR: 0.2, canopyR: 1.5, canopyY0: 1.9, canopyY1: 5.0 },
-  { name: 'poplar', geo: poplar, color: '#5c8a3a', trunkH: 2.0, trunkR: 0.14, canopyR: 0.75, canopyY0: 1.7, canopyY1: 6.6 },
+  // canopy: collision bands [y0, y1, radius] (unit tree) that follow the drawn crown.
+  { name: 'conifer', geo: coniferGeometry, color: '#2f5d34', trunkH: 1.2, trunkR: 0.16, canopyR: 1.3,
+    canopy: [[0.55, 1.5, 1.45], [1.5, 2.4, 1.2], [2.4, 3.3, 0.95], [3.3, 4.2, 0.65], [4.2, 5.0, 0.35]] },
+  { name: 'broadleaf', geo: broadleaf, color: '#4f7f35', trunkH: 2.3, trunkR: 0.2, canopyR: 1.8,
+    canopy: [[1.9, 2.4, 1.45], [2.4, 4.6, 1.95], [4.6, 5.1, 1.2]] },
+  { name: 'poplar', geo: poplar, color: '#5c8a3a', trunkH: 2.0, trunkR: 0.14, canopyR: 0.8,
+    canopy: [[1.5, 4.8, 0.85], [4.8, 6.4, 0.65]] },
 ];
 
 function keepOut(x, z, keepOutZones) {
@@ -165,11 +169,11 @@ export function createTrees(scene, collision, keepOutZones) {
     cm.setColorAt(cm.userData.added, col);
     cm.userData.added++;
 
-    const trunk = collision.addCylinder({ x: t.x, z: t.z, y0: t.y, y1: t.y + v.canopyY0 * t.scale, r: v.trunkR * t.scale });
-    const canopy = collision.addCylinder({
-      x: t.x, z: t.z, y0: t.y + v.canopyY0 * t.scale, y1: t.y + v.canopyY1 * t.scale, r: v.canopyR * t.scale,
-    });
-    colliders.push([trunk, canopy]);
+    const trunk = collision.addCylinder({ x: t.x, z: t.z, y0: t.y, y1: t.y + v.trunkH * t.scale, r: v.trunkR * t.scale });
+    const crown = v.canopy.map(([y0, y1, r]) => collision.addCylinder({
+      x: t.x, z: t.z, y0: t.y + y0 * t.scale, y1: t.y + y1 * t.scale, r: r * t.scale,
+    }));
+    colliders.push([trunk, ...crown]);
   });
   // For each variant, how many of its instances belong to the first N trees.
   const variantPrefix = (n) => VARIANTS.map((_, vi) => trees.slice(0, n).filter((t) => t.variant === vi).length);

@@ -65,8 +65,10 @@ optional peer dependencies.
   pad easy. Acro mode always uses the full throttle range.
 - The front of the quad has **orange props and green LEDs**, the back has dark props and red LEDs.
   In LOS you normally start with the tail towards you.
-- A hard impact (above about 7 m/s into a surface on the 5" preset) is a crash; press reset to go
-  back to the pad. Softer hits bounce.
+- Crashes (5" preset): hitting a tree, pole, gate, flag, bale or the tower from the side at more than
+  about 3 m/s (scraping along it counts too), or slamming into the ground, the pad or the top of
+  something at more than about 7 m/s. Press reset to go back to the pad. A gentle touch or a firm
+  landing just bounces. The beginner preset is a bit stricter, the tiny whoop more forgiving.
 
 ### Cameras
 

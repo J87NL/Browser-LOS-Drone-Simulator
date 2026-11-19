@@ -157,7 +157,9 @@ export function createCourse(scene, collision) {
     flag.userData.phase = i;
     group.add(flag);
     flags.push(flag);
-    collision.addCylinder({ x, z, y0, y1: y0 + 3.2, r: 0.2 });
+    collision.addCylinder({ x, z, y0, y1: y0 + 3.2, r: 0.05 }); // pole
+    // The banner turns with the wind around the pole: collide with the whole circle it can be in.
+    collision.addCylinder({ x, z, y0: y0 + 0.75, y1: y0 + 3.15, r: 0.72 });
   }
 
   // --- Dive tower: scaffold with a platform, good for LOS power loops.

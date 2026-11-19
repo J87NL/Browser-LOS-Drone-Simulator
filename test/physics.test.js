@@ -215,7 +215,7 @@ describe('Quad flight model', () => {
     for (let i = 0; i < 200; i++) fast.step(0.002, cmd({ thrust: hover }), w);
     expect(fast.crashed).not.toBeNull();
     const slow = airborne();
-    slow.vel.set(0, 0, -3);
+    slow.vel.set(0, 0, -2);
     let maxBack = 0;
     for (let i = 0; i < 500; i++) {
       slow.step(0.002, cmd({ thrust: hover }), w);
@@ -226,6 +226,41 @@ describe('Quad flight model', () => {
     // (a little rebound at most) and never passes into it.
     expect(maxBack).toBeGreaterThanOrEqual(0);
     expect(slow.pos.z).toBeGreaterThan(-2 + 0.1);
+  });
+
+  it('hitting the side of an obstacle crashes far below the landing limit', () => {
+    const pole = () => {
+      const w = new CollisionWorld(() => -100);
+      w.addCylinder({ x: 0, z: -1, y0: 0, y1: 40, r: 0.06 });
+      return w;
+    };
+    const run = (vx, vz) => {
+      const q = airborne();
+      q.vel.set(vx, 0, vz);
+      const w = pole();
+      for (let i = 0; i < 400 && !q.crashed; i++) q.step(0.002, cmd({ thrust: hover }), w);
+      return q;
+    };
+    expect(P.obstacleCrashSpeed).toBeLessThan(P.crashSpeed);
+    expect(run(0, -(P.obstacleCrashSpeed + 1)).crashed).not.toBeNull(); // head-on
+    expect(run(0, -1).crashed).toBeNull(); // a gentle touch is fine
+  });
+
+  it('scraping along a wall at speed is a crash; landing on the pad while moving is not', () => {
+    const wall = new CollisionWorld(() => -100);
+    wall.addBox({ x: 0.1 + P.radius - 0.01, y: 20, z: 0, hx: 0.1, hy: 5, hz: 50 });
+    const q = airborne();
+    q.vel.set(0.3, 0, -8); // mostly along the wall, slightly into it
+    for (let i = 0; i < 400 && !q.crashed; i++) q.step(0.002, cmd({ thrust: hover }), wall);
+    expect(q.crashed).not.toBeNull();
+
+    const pad = new CollisionWorld(() => 0);
+    pad.addBox({ x: 0, y: 0.025, z: 0, hx: 0.6, hy: 0.025, hz: 0.6 });
+    const l = new Quad(P);
+    l.reset(new Vector3(0, 0.4, 0.3));
+    l.vel.set(0, -3, -1.5); // firm landing with some forward speed
+    for (let i = 0; i < 500; i++) l.step(0.002, cmd(), pad);
+    expect(l.crashed).toBeNull();
   });
 
   it('a bigger drawn drone collides with its arms: banked low, a motor/prop probe touches first', () => {

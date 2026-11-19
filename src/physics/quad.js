@@ -293,8 +293,15 @@ export class Quad {
     if (vn < 0) {
       const impact = -vn;
       this.lastImpact = impact;
-      if (impact > p.crashSpeed) {
-        this.crash(impact);
+      // Landing surfaces (ground, pad, tops of things) forgive a firm touchdown
+      // and sliding along them. Hitting the side or underside of an obstacle
+      // crashes at a much lower speed, and there the full speed counts, so
+      // scraping along a post at speed is a crash too.
+      const landing = n.y > CONTACT.landingNormalY;
+      const severity = landing ? impact : _vP.length();
+      const limit = landing ? p.crashSpeed : p.obstacleCrashSpeed;
+      if (severity > limit) {
+        this.crash(severity);
         return true;
       }
       // Props and arms flex and soak up a hit, so probe contacts do not bounce.
