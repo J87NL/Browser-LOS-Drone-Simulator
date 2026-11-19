@@ -27,3 +27,17 @@ describe('analyseSky', () => {
     expect(horizon[0]).toBeCloseTo(0.5, 6);
   });
 });
+
+describe('analyseSky input formats', () => {
+  it('reads half-float data and maps u = 0.5 to +X', async () => {
+    const { DataUtils } = await import('three');
+    const w = 64;
+    const h = 32;
+    const data = new Uint16Array(w * h * 4).fill(DataUtils.toHalfFloat(0.5));
+    const i = (8 * w + 32) * 4; // u = (32.5)/64 ~ 0.508, a bit above the horizon
+    data[i] = data[i + 1] = data[i + 2] = DataUtils.toHalfFloat(1000);
+    const { sun } = analyseSky({ width: w, height: h, data });
+    expect(sun.x).toBeGreaterThan(0.6);
+    expect(Math.abs(sun.z)).toBeLessThan(0.1);
+  });
+});

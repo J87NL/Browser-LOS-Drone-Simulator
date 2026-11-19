@@ -205,8 +205,9 @@ Esc opens the settings panel (the sim pauses while it is open):
   into the wind; on the ground it stays put.
 - Low quality (no shadows, pixel ratio 1, about a third of the trees). Use this on weak iGPUs.
 - Photo quality: ambient occlusion and sharper, wider sun shadows, plus a real sky (HDRI) and a
-  photo-scanned ground texture when those images are installed in `static/photo/` (see the README
-  there; Poly Haven and ambientCG have suitable CC0 files). Heavier than the default.
+  photo-scanned ground texture when those images are installed in `static/photo/` (see
+  [docs/photo-assets.md](docs/photo-assets.md); Poly Haven and ambientCG have suitable CC0 files).
+  Heavier than the default, and off while Low quality is on.
 - Motor sound volume (off by default).
 
 Everything is saved in `localStorage`. "Reset all settings" restores the defaults (controller

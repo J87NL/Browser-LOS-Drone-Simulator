@@ -9,7 +9,7 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 
-// Files are served from static/ (copied into the build). See static/photo/README.md.
+// Files are served from static/ (copied into the build). See docs/photo-assets.md.
 export const PHOTO_ASSETS = {
   sky: 'photo/sky.hdr',
   groundColor: 'photo/ground_diff.jpg',
@@ -18,15 +18,45 @@ export const PHOTO_ASSETS = {
   groundTileMetres: 3, // how many metres one repeat of the ground texture covers
 };
 
+// Light levels with a real sky. Starting values: tune them to the HDRI you install.
+export const PHOTO_LIGHT = { environment: 0.8, hemi: 0, sun: 1.8 };
+
 const MIN_SUN_ELEVATION = THREE.MathUtils.degToRad(12);
+const MAX_SKY_WIDTH = 4096;
+
+/** A missing file is normal (the photos are optional); anything else is worth a warning. */
+function report(what, error) {
+  const status = error?.target?.status ?? error?.status;
+  const missing = status === 404 || /404|not found/i.test(String(error?.message ?? ''));
+  if (!missing) console.warn(`Photo quality: could not use ${what}:`, error);
+  return null;
+}
+
+/** Hide what should not get ambient occlusion: sprites and see-through or invisible surfaces. */
+function patchGtaoVisibility(gtao) {
+  const original = gtao._overrideVisibility.bind(gtao);
+  gtao._overrideVisibility = function overrideVisibility() {
+    original();
+    this.scene.traverse((o) => {
+      const m = o.material;
+      const seeThrough = m && !Array.isArray(m) && ((m.transparent && !m.depthWrite) || m.opacity === 0);
+      if (o.visible && (o.isSprite || seeThrough)) {
+        o.visible = false;
+        this._visibilityCache.push(o);
+      }
+    });
+  };
+}
 
 /**
  * Brightest pixel of an equirectangular float image = the sun, as a world
  * direction (three.js equirect mapping, flipY), plus the average horizon colour.
- * @param {{width:number,height:number,data:Float32Array}} image RGBA float data
+ * @param {{width:number,height:number,data:Float32Array|Uint16Array}} image RGBA float or half-float data
  */
 export function analyseSky(image) {
-  const { width: w, height: h, data } = image;
+  const { width: w, height: h } = image;
+  // HDRLoader gives half floats (Uint16Array) by default; accept both.
+  const data = image.data instanceof Uint16Array ? Float32Array.from(image.data, THREE.DataUtils.fromHalfFloat) : image.data;
   let best = -1;
   let bx = 0;
   let by = 0;
@@ -72,6 +102,7 @@ export function createPhotoMode({ renderer, scene, camera, sky, sunDir, lights, 
     radius: 0.6, distanceExponent: 1.5, thickness: 1, scale: 1, samples: 12, distanceFallOff: 1, screenSpaceRadius: false,
   });
   gtao.blendIntensity = 0.9;
+  patchGtaoVisibility(gtao);
   composer.addPass(gtao);
   composer.addPass(new OutputPass());
 
@@ -80,6 +111,8 @@ export function createPhotoMode({ renderer, scene, camera, sky, sunDir, lights, 
     background: scene.background,
     environment: scene.environment,
     environmentIntensity: scene.environmentIntensity,
+    hemi: lights.hemi.intensity,
+    sunIntensity: lights.sun.intensity,
     fog: scene.fog.color.clone(),
     sun: sunDir.clone(),
     map: mat.map,
@@ -96,14 +129,19 @@ export function createPhotoMode({ renderer, scene, camera, sky, sunDir, lights, 
       t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
       if (srgb) t.colorSpace = THREE.SRGBColorSpace;
       return t;
-    }).catch(() => null);
+    }).catch((e) => report(url, e));
 
   function load() {
     if (loaded) return loaded;
+    // Half floats: half the memory of FloatType and linear filtering works on
+    // every WebGL2 GPU (float textures need an extension for that).
     const skyP = new HDRLoader()
-      .setDataType(THREE.FloatType)
+      .setDataType(THREE.HalfFloatType)
       .loadAsync(PHOTO_ASSETS.sky)
       .then((tex) => {
+        if (tex.image.width > MAX_SKY_WIDTH) {
+          throw new Error(`sky.hdr is ${tex.image.width} px wide; use ${MAX_SKY_WIDTH} px (2k) or less`);
+        }
         tex.mapping = THREE.EquirectangularReflectionMapping;
         const analysis = analyseSky(tex.image);
         const pmrem = new THREE.PMREMGenerator(renderer);
@@ -111,7 +149,7 @@ export function createPhotoMode({ renderer, scene, camera, sky, sunDir, lights, 
         pmrem.dispose();
         return { tex, env, analysis };
       })
-      .catch(() => null);
+      .catch((e) => report('sky.hdr', e));
     loaded = Promise.all([
       skyP,
       loadTexture(PHOTO_ASSETS.groundColor, true),
@@ -127,7 +165,11 @@ export function createPhotoMode({ renderer, scene, camera, sky, sunDir, lights, 
       sky.visible = !on;
       scene.background = on ? tex : original.background;
       scene.environment = on ? env : original.environment;
-      scene.environmentIntensity = on ? 1 : original.environmentIntensity;
+      // A real sky lights the scene itself (its sun is in the image), so the
+      // fill light goes off and the direct sun is toned down to avoid lighting twice.
+      scene.environmentIntensity = on ? PHOTO_LIGHT.environment : original.environmentIntensity;
+      lights.hemi.intensity = on ? PHOTO_LIGHT.hemi : original.hemi;
+      lights.sun.intensity = on ? PHOTO_LIGHT.sun : original.sunIntensity;
       if (on) {
         scene.fog.color.setRGB(...analysis.horizon, THREE.LinearSRGBColorSpace);
         sunDir.copy(analysis.sun);

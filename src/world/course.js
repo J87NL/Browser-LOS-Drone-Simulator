@@ -4,6 +4,13 @@ import { terrainHeight } from './terrain-height.js';
 
 export const PAD = { x: 0, z: 0, half: 0.6, top: 0.05 };
 
+/** Yaw that points a flag's local +X (the banner) downwind. */
+export function flagYaw(wind) {
+  return Math.atan2(-wind.z, wind.x);
+}
+
+const angleDelta = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
+
 function padTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = 256;
@@ -128,6 +135,7 @@ export function createCourse(scene, collision) {
       p.setZ(i, Math.sin(x * 4) * 0.08);
       if (y > 0) p.setY(i, y - x * x * 0.9);
     }
+    flagGeo.translate(0.35, 0, 0); // banner starts at the pole and extends along local +X
     flagGeo.computeVertexNormals();
   }
   const flagPoleGeo = new THREE.CylinderGeometry(0.025, 0.03, 3.2, 8);
@@ -144,7 +152,7 @@ export function createCourse(scene, collision) {
     group.add(pole);
     const mat = new THREE.MeshStandardMaterial({ color: flagColors[i % flagColors.length], side: THREE.DoubleSide, roughness: 0.75 });
     const flag = shadow(new THREE.Mesh(flagGeo, mat));
-    flag.position.set(x + 0.03, y0 + 1.95, z);
+    flag.position.set(x, y0 + 1.95, z);
     flag.rotation.y = a + Math.PI / 2;
     flag.userData.phase = i;
     group.add(flag);
@@ -192,14 +200,12 @@ export function createCourse(scene, collision) {
       { x: 30, z: -15, r: 6 },
     ],
     /** Flags turn to fly downwind and flutter more in stronger wind. */
-    update(t, wind = null) {
+    update(t, dt, wind = null) {
       const ws = wind ? Math.hypot(wind.x, wind.z) : 0;
+      const turn = 1 - Math.exp(-3 * dt);
       for (const f of flags) {
         if (ws > 0.3) {
-          const target = Math.atan2(-wind.z, wind.x); // banner extends along local +X
-          let d = target - f.rotation.y;
-          d = Math.atan2(Math.sin(d), Math.cos(d));
-          f.rotation.y += d * 0.05;
+          f.rotation.y += angleDelta(f.rotation.y, flagYaw(wind)) * turn;
         }
         f.rotation.z = Math.sin(t * (1.3 + ws * 0.5) + f.userData.phase) * (0.04 + ws * 0.01);
       }

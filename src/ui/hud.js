@@ -2,6 +2,12 @@
 import { h } from './dom.js';
 import { CAMERA_LABELS } from '../cameras.js';
 
+/** Continue `raw` (degrees) from `last` the short way round, so a CSS rotation never spins 360°. */
+export function unwrapDegrees(last, raw) {
+  const d = ((((raw - last) % 360) + 540) % 360) - 180;
+  return last + d;
+}
+
 export class Hud {
   constructor(parent) {
     this.armed = h('div', { class: 'hud-pill' });
@@ -55,11 +61,12 @@ export class Hud {
     this._set(this.thrText, 'thr', `${Math.round(throttle * 100)}%`);
     this._set(this.speed, 'spd', `${(speed * 3.6).toFixed(0)} km/h`);
     this._set(this.alt, 'alt', `${altitude.toFixed(1)} m`);
-    // Wind: speed and an arrow for where it blows to, as seen from the pilot (looking ahead = up).
+    // Wind: speed and an arrow for where it blows to, seen from the start position (ahead = up).
     const ws = wind ? Math.hypot(wind.x, wind.z) : 0;
     if (ws > 0.05) {
-      const deg = Math.round((Math.atan2(wind.x, -wind.z) * 180) / Math.PI);
-      this.windArrow.style.transform = `rotate(${deg}deg)`;
+      const raw = (Math.atan2(wind.x, -wind.z) * 180) / Math.PI;
+      this.windDeg = unwrapDegrees(this.windDeg ?? raw, raw);
+      this.windArrow.style.transform = `rotate(${this.windDeg.toFixed(1)}deg)`;
       this._set(this.windText, 'wind', `${ws.toFixed(1)} m/s`);
     }
     this.windRow.classList.toggle('hidden', !(ws > 0.05));

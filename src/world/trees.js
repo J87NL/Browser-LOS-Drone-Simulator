@@ -213,7 +213,7 @@ export function createTrees(scene, collision, keepOutZones) {
       // Sway phase advances faster and further in stronger wind.
       wind.value += (time - lastTime) * (1 + windSpeed * 0.25);
       lastTime = time;
-      windStrength.value = 1 + windSpeed * 0.35;
+      windStrength.value = 1 + Math.min(windSpeed, 10) * 0.12; // capped: shadows and AO do not sway
     },
     count: trees.length,
     setCount(n) {

@@ -1,7 +1,9 @@
 # Photo quality images (optional)
 
-Settings → "Photo quality" uses these files when they are present. Missing files keep the
-procedural look; ambient occlusion and the sharper shadows work either way.
+Put these files in `static/photo/`. Settings → "Photo quality" uses them when they are present
+(Low quality switches Photo quality off). Missing files keep the procedural look; ambient occlusion
+and the sharper shadows work either way. A sky wider than 4096 px is refused (2k is plenty).
+The normal and roughness maps are only used together with `ground_diff.jpg`.
 
 | File | What | Suggested source (CC0) |
 | --- | --- | --- |
@@ -11,4 +13,5 @@ procedural look; ambient occlusion and the sharper shadows work either way.
 | `ground_rough.jpg` | Matching roughness map | same set (`_rough`) |
 
 One repeat of the ground texture covers `PHOTO_ASSETS.groundTileMetres` (3 m) in `src/photo.js`;
-change it to match the scale of the texture you pick.
+change it to match the scale of the texture you pick. With a real sky the scene is lit by the image;
+the light levels are `PHOTO_LIGHT` in the same file and may need tuning for the HDRI you pick.

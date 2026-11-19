@@ -11,7 +11,6 @@ import { terrainHeight } from './world/terrain-height.js';
 import { createTerrain } from './world/terrain.js';
 import { createDistantLand } from './world/distant.js';
 import { createSky } from './world/sky.js';
-import { createPhotoMode } from './photo.js';
 import { createLights } from './world/lights.js';
 import { createTrees } from './world/trees.js';
 import { createCourse, PAD } from './world/course.js';
@@ -52,7 +51,17 @@ const { sky, sunDir } = createSky(renderer, scene);
 const lights = createLights(scene, sunDir);
 const terrain = createTerrain(renderer);
 scene.add(terrain);
-const photo = createPhotoMode({ renderer, scene, camera, sky, sunDir, lights, terrain });
+// Photo quality is loaded on first use, so its code is not in the main bundle.
+let photo = null;
+let photoLoading = null;
+function getPhoto() {
+  photoLoading ??= import('./photo.js').then(({ createPhotoMode }) => {
+    photo = createPhotoMode({ renderer, scene, camera, sky, sunDir, lights, terrain });
+    resize();
+    return photo;
+  });
+  return photoLoading;
+}
 createDistantLand(scene);
 
 const collision = new CollisionWorld(terrainHeight);
@@ -133,12 +142,12 @@ function applySettings(key) {
   if (all || key === 'lowQuality' || key === 'photoMode') {
     const low = settings.lowQuality;
     const wantPhoto = settings.photoMode && !low;
-    if (wantPhoto !== photo.enabled) {
-      photo.setEnabled(wantPhoto).then((found) => {
-        if (!wantPhoto || key === 'init') return;
+    if (wantPhoto !== !!photo?.enabled && (wantPhoto || photo)) {
+      getPhoto().then((p) => p.setEnabled(wantPhoto)).then((found) => {
+        if (!photo?.enabled || key === 'init') return; // switched off again meanwhile
         const missing = [!found.sky && 'sky', !found.ground && 'ground texture'].filter(Boolean);
         toasts.show(missing.length
-          ? `Photo quality on (ambient occlusion, sharper shadows). Photo ${missing.join(' and ')} not installed: see static/photo/README.md`
+          ? `Photo quality on (ambient occlusion, sharper shadows). Photo ${missing.join(' and ')} not installed: see docs/photo-assets.md`
           : 'Photo quality on', 4000);
       });
     }
@@ -221,7 +230,8 @@ function resize() {
   camera.updateProjectionMatrix();
   renderer.setPixelRatio(pr);
   renderer.setSize(innerWidth, innerHeight);
-  photo.setSize(innerWidth, innerHeight, pr);
+  // Photo quality renders AO at up to 1.5x pixel ratio to keep it affordable.
+  photo?.setSize(innerWidth, innerHeight, Math.min(pr, 1.5));
 }
 window.addEventListener('resize', resize);
 
@@ -282,12 +292,13 @@ function frame(now) {
     thrustToWeight: preset().thrustToWeight,
   });
 
-  windAt(stepper.time, settings, quad.wind);
-
   let steps = 0;
   let alpha = 1;
   if (!paused) {
-    ({ steps, alpha } = stepper.advance(dt, (h) => quad.step(h, cmd, collision)));
+    ({ steps, alpha } = stepper.advance(dt, (h) => {
+      windAt(stepper.time, settings, quad.wind); // per physics step: frame-rate independent
+      quad.step(h, cmd, collision);
+    }));
   }
   quad.renderPose(alpha, renderPos, renderQuat);
 
@@ -304,7 +315,7 @@ function frame(now) {
   const camDist = camera.position.distanceTo(renderPos);
   drone.update(quad.motor, paused ? 0 : dt, camDist, rig.mode === 'fpv');
   lights.follow(renderPos);
-  course.update(elapsed, quad.wind);
+  course.update(elapsed, dt, quad.wind);
   trees.update(elapsed, quad.wind.length());
   sound.update(paused ? 0 : quad.motor, quad.armed && !paused, rig.mode === 'fpv' ? 1 : camDist);
 
@@ -329,7 +340,7 @@ function frame(now) {
   });
   debug.update(dt, { steps, simTime: stepper.time, input: state, thrust: cmd.thrust, quad, pad });
 
-  if (photo.enabled) photo.render();
+  if (photo?.enabled) photo.render();
   else renderer.render(scene, camera);
 }
 requestAnimationFrame(frame);
