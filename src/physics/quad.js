@@ -4,7 +4,7 @@
 //   pitch down  = negative rotation about body +X (stick forward)
 //   yaw right   = negative rotation about body +Y
 import { Vector3, Quaternion } from 'three';
-import { GRAVITY, CONTACT, ANGLE_MODE, MOTOR } from '../config.js';
+import { GRAVITY, CONTACT, ANGLE_MODE, MOTOR, PROBES } from '../config.js';
 import { actualRateRad } from './rates.js';
 
 const UP = new Vector3(0, 1, 0);
@@ -22,6 +22,12 @@ const _upDes = new Vector3();
 const _tiltAxis = new Vector3();
 const _yawW = new Vector3();
 const _tan = new Vector3();
+const _rW = new Vector3();
+const _probe = new Vector3();
+const _gn = new Vector3();
+const _wW = new Vector3();
+const _vP = new Vector3();
+const _tmp = new Vector3();
 
 export class Quad {
   constructor(params) {
@@ -40,6 +46,8 @@ export class Quad {
     this.crashed = null; // { speed } when crashed
     this.grounded = false;
     this.lastImpact = 0;
+    this.drawScale = 1;
+    this.setDrawScale(1);
   }
 
   get maxThrust() {
@@ -48,6 +56,24 @@ export class Quad {
 
   setParams(params) {
     this.params = params;
+    this.setDrawScale(this.drawScale);
+  }
+
+  /**
+   * Place the motor collision probes for the drawn size (1 = real size).
+   * The model is drawn lifted so its feet rest on the centre sphere's bottom;
+   * the probes use the same lift.
+   */
+  setDrawScale(droneSize = 1) {
+    this.drawScale = droneSize;
+    const p = this.params;
+    const s = p.modelScale * droneSize;
+    const lift = PROBES.feetDepth * s - p.radius;
+    const y = PROBES.motorY * s + lift;
+    const m = PROBES.motor * s;
+    this.probes = [[m, m], [m, -m], [-m, m], [-m, -m]].map(([x, z]) => new Vector3(x, y, z));
+    this.probeRadius = PROBES.radius * s;
+    this.inertia = p.mass * (PROBES.inertiaK * s) ** 2;
   }
 
   /** Put the quad at rest at `position`, facing `heading` (0 = -Z). */
@@ -87,7 +113,13 @@ export class Quad {
 
     // --- Rate targets --------------------------------------------------
     const t = this.targetRates;
-    if (this.armed) {
+    // Like a real quad without air mode: sitting on the ground with less
+    // thrust than it takes to lift off, the sticks do not spin it.
+    const idleOnGround = this.grounded && cmd.thrust * p.thrustToWeight < CONTACT.groundIdleLift;
+    if (this.armed && idleOnGround) {
+      t.set(0, 0, 0);
+      this.omega.multiplyScalar(Math.exp(-dt * CONTACT.groundSpinDamping));
+    } else if (this.armed) {
       if (cmd.mode === 'acro') {
         t.set(
           -actualRateRad(cmd.pitch, cmd.rates.pitch),
@@ -194,29 +226,22 @@ export class Quad {
   _collide(dt, world) {
     const p = this.params;
     this.grounded = false;
-    const contacts = world.contacts(this.pos, p.radius);
     let groundNormal = null;
-    for (const c of contacts) {
-      const n = c.normal;
-      this.pos.addScaledVector(n, c.depth);
-      const vn = this.vel.dot(n);
-      if (vn < 0) {
-        const impact = -vn;
-        this.lastImpact = impact;
-        if (impact > p.crashSpeed) {
-          this.crash(impact);
-          return;
-        }
-        const e = impact > CONTACT.restingSpeed ? p.restitution : 0;
-        this.vel.addScaledVector(n, -(1 + e) * vn);
+    // Centre sphere first, then the motor probes (arms and props).
+    for (let k = -1; k < this.probes.length; k++) {
+      let contacts;
+      let r = null;
+      if (k < 0) contacts = world.contacts(this.pos, p.radius);
+      else {
+        r = _rW.copy(this.probes[k]).applyQuaternion(this.quat);
+        contacts = world.contacts(_probe.copy(this.pos).add(r), this.probeRadius);
       }
-      // Tangential friction.
-      const vn2 = this.vel.dot(n);
-      _tan.copy(this.vel).addScaledVector(n, -vn2);
-      this.vel.addScaledVector(_tan, -(1 - Math.exp(-CONTACT.friction * dt)));
-      if (n.y > 0.6) {
-        this.grounded = true;
-        groundNormal = n;
+      for (const c of contacts) {
+        if (this._resolveContact(c, r, dt)) return; // crashed
+        if (c.normal.y > 0.6) {
+          this.grounded = true;
+          groundNormal = _gn.copy(c.normal);
+        }
       }
     }
 
@@ -233,6 +258,48 @@ export class Quad {
       }
       this.omega.multiplyScalar(Math.exp(-CONTACT.groundSpinDamping * dt));
     }
+  }
+
+  /**
+   * Resolve one contact at offset `r` from the centre (world frame; null for
+   * the centre sphere). Returns true when the impact is a crash.
+   */
+  _resolveContact(c, r, dt) {
+    const p = this.params;
+    const n = c.normal;
+    this.pos.addScaledVector(n, c.depth);
+    // Velocity of the contact point: v + w x r.
+    _wW.copy(this.omega).applyQuaternion(this.quat);
+    _vP.copy(this.vel);
+    if (r) _vP.add(_tmp.crossVectors(_wW, r));
+    const vn = _vP.dot(n);
+    if (vn < 0) {
+      const impact = -vn;
+      this.lastImpact = impact;
+      if (impact > p.crashSpeed) {
+        this.crash(impact);
+        return true;
+      }
+      const e = impact > CONTACT.restingSpeed ? p.restitution : 0;
+      // Impulse with the effective mass at the contact point.
+      let denom = 1 / p.mass;
+      if (r) {
+        _tmp.crossVectors(r, n);
+        denom += _tmp.lengthSq() / this.inertia;
+      }
+      const j = (-(1 + e) * vn) / denom;
+      this.vel.addScaledVector(n, j / p.mass);
+      if (r) {
+        // r x n is still in _tmp: angular impulse, world -> body.
+        _qInv.copy(this.quat).invert();
+        this.omega.add(_tmp.multiplyScalar(j / this.inertia).applyQuaternion(_qInv));
+      }
+    }
+    // Tangential friction.
+    const vn2 = this.vel.dot(n);
+    _tan.copy(this.vel).addScaledVector(n, -vn2);
+    this.vel.addScaledVector(_tan, -(1 - Math.exp(-CONTACT.friction * dt)));
+    return false;
   }
 
   crash(speed) {

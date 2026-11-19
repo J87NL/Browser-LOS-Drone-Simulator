@@ -4,7 +4,12 @@ import { PRESETS } from '../src/config.js';
 
 // The model draws a glow texture on a canvas; stub just enough of the DOM.
 beforeAll(() => {
-  const ctx = { createRadialGradient: () => ({ addColorStop() {} }), fillRect() {} };
+  // Any 2D context call is a no-op; gradient factories return a stub.
+  const gradient = { addColorStop() {} };
+  const ctx = new Proxy({}, {
+    get: (_t, k) => (String(k).startsWith('create') ? () => gradient : () => {}),
+    set: () => true,
+  });
   globalThis.document = { createElement: () => ({ width: 0, height: 0, getContext: () => ctx }) };
 });
 

@@ -17,9 +17,15 @@ export function inArmCorners({ throttle, yaw, pitch, roll }) {
   return outward || inward;
 }
 
+const centred = ({ yaw, pitch, roll }) => Math.max(Math.abs(yaw), Math.abs(pitch), Math.abs(roll)) < INPUT.stickArmRelease;
+
 export class ArmGesture {
   constructor() {
     this.reset();
+    // After a stick-command arm the sticks are still in the corners. Yaw,
+    // pitch and roll stay locked until they return to centre, otherwise the
+    // quad would start spinning right away.
+    this.sticksLocked = false;
   }
 
   reset() {
@@ -37,6 +43,7 @@ export class ArmGesture {
    * @returns {'arm'|'disarm'|null}
    */
   update(dt, sticks, { armed, grounded }) {
+    if (this.sticksLocked && (centred(sticks) || !armed)) this.sticksLocked = false;
     if (!inArmCorners(sticks)) {
       this.reset();
       return null;
@@ -51,6 +58,7 @@ export class ArmGesture {
     this.held += dt;
     if (this.held < HOLD) return null;
     this.fired = true;
+    if (!armed) this.sticksLocked = true;
     return armed ? 'disarm' : 'arm';
   }
 }

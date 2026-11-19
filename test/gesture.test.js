@@ -73,3 +73,30 @@ describe('stick-command arming', () => {
     expect(hold(g, outward, 5, { armed: true, grounded: false })).toBeNull();
   });
 });
+
+// Hold until the gesture fires (main arms the quad in that same frame).
+const holdUntilFired = (g, sticks, ctx) => {
+  for (let t = 0; t < 10; t += 0.02) if (g.update(0.02, sticks, ctx)) return;
+};
+
+describe('stick lock after a stick-command arm', () => {
+  it('locks yaw/pitch/roll after arming until the sticks return to centre', () => {
+    const g = new ArmGesture();
+    holdUntilFired(g, outward, { armed: false, grounded: true });
+    expect(g.sticksLocked).toBe(true);
+    // Still holding the corners (and then moving out of them, not yet centred).
+    g.update(0.02, outward, { armed: true, grounded: true });
+    g.update(0.02, { throttle: 0, yaw: -0.5, pitch: 0, roll: 0 }, { armed: true, grounded: true });
+    expect(g.sticksLocked).toBe(true);
+    g.update(0.02, { throttle: 0, yaw: 0.05, pitch: -0.05, roll: 0 }, { armed: true, grounded: true });
+    expect(g.sticksLocked).toBe(false);
+  });
+
+  it('releases the lock when disarmed', () => {
+    const g = new ArmGesture();
+    holdUntilFired(g, outward, { armed: false, grounded: true });
+    expect(g.sticksLocked).toBe(true);
+    g.update(0.02, outward, { armed: false, grounded: true });
+    expect(g.sticksLocked).toBe(false);
+  });
+});

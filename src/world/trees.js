@@ -1,38 +1,77 @@
 // Instanced low-poly trees in three variants, with cylinder colliders.
 // Trees are generated in a random order; low quality simply uses a prefix.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { WORLD } from '../config.js';
 import { terrainHeight, fbm } from './terrain-height.js';
 import { mulberry32 } from './rng.js';
 
+/**
+ * Jitter vertices (welded first, so faces stay closed) and add vertex colours
+ * that darken towards the bottom and inside of the crown, which reads as
+ * self-shadowing.
+ */
+function finishCanopy(geo, seed, amount, y0, y1) {
+  geo = mergeVertices(geo.deleteAttribute('normal').deleteAttribute('uv'));
+  const rand = mulberry32(seed);
+  const p = geo.attributes.position;
+  const colors = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i);
+    const y = p.getY(i);
+    const z = p.getZ(i);
+    const k = 1 + (rand() - 0.5) * amount;
+    p.setXYZ(i, x * k, y + (rand() - 0.5) * amount * 0.6, z * k);
+    const t = Math.min(1, Math.max(0, (y - y0) / (y1 - y0)));
+    const shade = 0.55 + t * 0.45 + (rand() - 0.5) * 0.12;
+    colors[i * 3] = colors[i * 3 + 1] = colors[i * 3 + 2] = shade;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
 function coniferGeometry() {
   const parts = [];
   const layers = [
-    [1.6, 2.2, 1.6],
-    [1.25, 1.9, 2.7],
-    [0.85, 1.6, 3.7],
+    [1.7, 1.9, 1.5],
+    [1.45, 1.8, 2.3],
+    [1.15, 1.6, 3.1],
+    [0.85, 1.4, 3.85],
+    [0.5, 1.2, 4.5],
   ];
   for (const [r, h, y] of layers) {
-    const g = new THREE.ConeGeometry(r, h, 7, 1);
+    const g = new THREE.ConeGeometry(r, h, 9, 2, true);
     g.translate(0, y, 0);
     parts.push(g);
   }
-  return mergeGeometries(parts);
+  return finishCanopy(mergeGeometries(parts), 11, 0.22, 0.5, 5.1);
 }
 
-function blobGeometry(sx, sy, y, detail = 1) {
-  const g = new THREE.IcosahedronGeometry(1, detail);
-  g.scale(sx, sy, sx);
-  g.translate(0, y, 0);
-  return g;
+function clusterGeometry(blobs, seed, y0, y1) {
+  const parts = blobs.map(([x, y, z, r, sy = 1]) => {
+    const g = new THREE.IcosahedronGeometry(r, 1);
+    g.scale(1, sy, 1);
+    g.translate(x, y, z);
+    return g;
+  });
+  return finishCanopy(mergeGeometries(parts), seed, 0.25, y0, y1);
 }
+
+const broadleaf = () => clusterGeometry([
+  [0, 3.3, 0, 1.45], [1.0, 2.9, 0.3, 1.0], [-0.9, 3.0, -0.4, 1.05], [0.2, 3.0, -1.0, 0.95],
+  [-0.3, 2.8, 1.0, 1.0], [0.3, 4.1, 0.2, 1.0], [-0.5, 3.9, -0.3, 0.9],
+], 21, 1.9, 5.0);
+
+const poplar = () => clusterGeometry([
+  [0, 3.0, 0, 0.85, 1.5], [0.15, 4.4, 0.1, 0.75, 1.6], [-0.1, 5.6, -0.05, 0.55, 1.5], [0.2, 2.4, -0.2, 0.7, 1.2],
+], 31, 1.7, 6.6);
 
 const VARIANTS = [
   // canopy geometry, canopy colour, trunk height, trunk radius, collider radius/top/bottom (in unit tree space)
   { name: 'conifer', geo: coniferGeometry, color: '#2f5d34', trunkH: 1.2, trunkR: 0.16, canopyR: 1.1, canopyY0: 0.6, canopyY1: 4.5 },
-  { name: 'broadleaf', geo: () => blobGeometry(1.8, 1.5, 3.2), color: '#4f7f35', trunkH: 2.2, trunkR: 0.2, canopyR: 1.4, canopyY0: 1.9, canopyY1: 4.6 },
-  { name: 'poplar', geo: () => blobGeometry(0.9, 2.6, 4.2), color: '#5c8a3a', trunkH: 2.0, trunkR: 0.14, canopyR: 0.7, canopyY0: 1.7, canopyY1: 6.6 },
+  { name: 'broadleaf', geo: broadleaf, color: '#4f7f35', trunkH: 2.3, trunkR: 0.2, canopyR: 1.5, canopyY0: 1.9, canopyY1: 5.0 },
+  { name: 'poplar', geo: poplar, color: '#5c8a3a', trunkH: 2.0, trunkR: 0.14, canopyR: 0.75, canopyY0: 1.7, canopyY1: 6.6 },
 ];
 
 function keepOut(x, z, keepOutZones) {
@@ -70,9 +109,26 @@ export function createTrees(scene, collision, keepOutZones) {
   trunks.castShadow = true;
   trunks.receiveShadow = true;
 
+  // Shared wind: canopies sway a little, more at the top.
+  const wind = { value: 0 };
   const canopies = VARIANTS.map((v) => {
     const count = trees.filter((t) => t.variant === VARIANTS.indexOf(v)).length;
-    const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9, flatShading: true });
+    const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.9, flatShading: true, side: THREE.DoubleSide });
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uWind = wind;
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nuniform float uWind;')
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          #ifdef USE_INSTANCING
+            vec2 tp = instanceMatrix[3].xz;
+          #else
+            vec2 tp = vec2(0.0);
+          #endif
+          float sway = sin(uWind * 1.1 + tp.x * 0.13 + tp.y * 0.07) + 0.4 * sin(uWind * 2.3 + tp.x * 0.5);
+          float hgt = max(transformed.y - 1.5, 0.0);
+          transformed.x += sway * 0.025 * hgt;
+          transformed.z += sway * 0.012 * hgt;`);
+    };
     const mesh = new THREE.InstancedMesh(v.geo(), mat, Math.max(1, count));
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -112,13 +168,48 @@ export function createTrees(scene, collision, keepOutZones) {
   // For each variant, how many of its instances belong to the first N trees.
   const variantPrefix = (n) => VARIANTS.map((_, vi) => trees.slice(0, n).filter((t) => t.variant === vi).length);
 
-  scene.add(trunks, ...canopies);
+  // Soft contact shadows under every tree: they ground the trees at any
+  // distance (the sun's shadow map only covers the area around the drone).
+  const blobGeo = new THREE.PlaneGeometry(1, 1);
+  blobGeo.rotateX(-Math.PI / 2);
+  const blobTex = (() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d');
+    const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, 'rgba(0,0,0,0.55)');
+    grad.addColorStop(0.6, 'rgba(0,0,0,0.25)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  })();
+  const blobs = new THREE.InstancedMesh(
+    blobGeo,
+    new THREE.MeshBasicMaterial({ color: '#000', map: blobTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
+    trees.length,
+  );
+  blobs.renderOrder = 1;
+  trees.forEach((t, i) => {
+    const v = VARIANTS[t.variant];
+    const r = v.canopyR * t.scale * 2.6;
+    p.set(t.x, terrainHeight(t.x, t.z) + 0.02, t.z);
+    q.identity();
+    s.set(r, 1, r);
+    blobs.setMatrixAt(i, m.compose(p, q, s));
+  });
+
+  scene.add(trunks, ...canopies, blobs);
 
   return {
+    update(time) {
+      wind.value = time;
+    },
     count: trees.length,
     setCount(n) {
       n = Math.min(n, trees.length);
       trunks.count = n;
+      blobs.count = n;
       variantPrefix(n).forEach((c, vi) => (canopies[vi].count = c));
       colliders.forEach((pair, i) => pair.forEach((c) => (c.enabled = i < n)));
     },

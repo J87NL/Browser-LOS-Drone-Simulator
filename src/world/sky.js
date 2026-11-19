@@ -24,7 +24,7 @@ export function createSky(renderer, scene) {
   u.sunPosition.value.copy(sunDir);
   scene.add(sky);
 
-  scene.fog = new THREE.Fog(FOG_COLOR, 320, 1500);
+  scene.fog = new THREE.Fog(FOG_COLOR, 320, 2900); // far enough to see the distant mountains as haze
   scene.background = FOG_COLOR;
 
   // Environment lighting from the sky only.

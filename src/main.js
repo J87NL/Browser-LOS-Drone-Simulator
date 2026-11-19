@@ -8,6 +8,8 @@ import { CollisionWorld } from './physics/colliders.js';
 import { shapeThrottle } from './physics/controls.js';
 import { terrainHeight } from './world/terrain-height.js';
 import { createTerrain } from './world/terrain.js';
+import { createDistantLand } from './world/distant.js';
+import { createGrass } from './world/grass.js';
 import { createSky } from './world/sky.js';
 import { createLights } from './world/lights.js';
 import { createTrees } from './world/trees.js';
@@ -48,6 +50,8 @@ const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 60
 const { sunDir } = createSky(renderer, scene);
 const lights = createLights(scene, sunDir);
 scene.add(createTerrain(renderer));
+createDistantLand(scene);
+const grass = createGrass(scene);
 
 const collision = new CollisionWorld(terrainHeight);
 const course = createCourse(scene, collision);
@@ -119,6 +123,7 @@ gamepads.addEventListener('disconnect', (e) => {
 
 function applySettings(key) {
   const all = key === 'all' || key === 'init';
+  if (all || key === 'preset' || key === 'droneSize') quad.setDrawScale(settings.droneSize);
   if (all || key === 'preset') {
     quad.setParams(preset());
     resetDrone();
@@ -128,8 +133,8 @@ function applySettings(key) {
     lights.setShadows(!low);
     trees.setShadows(!low);
     trees.setCount(low ? WORLD.treeCountLow : WORLD.treeCountHigh);
-    renderer.setPixelRatio(Math.min(devicePixelRatio, low ? 1 : 2));
-    renderer.setSize(innerWidth, innerHeight);
+    grass.setVisible(!low);
+    resize();
   }
   if (all || key === 'showDebug') debug.setVisible(settings.showDebug);
   if (all || key === 'volume') sound.setVolume(settings.volume);
@@ -199,11 +204,14 @@ window.addEventListener('keydown', (e) => {
   }
 });
 window.addEventListener('pointerdown', () => sound.unlock());
-window.addEventListener('resize', () => {
+function resize() {
+  const pr = Math.min(devicePixelRatio, settings.lowQuality ? 1 : 2);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
+  renderer.setPixelRatio(pr);
   renderer.setSize(innerWidth, innerHeight);
-});
+}
+window.addEventListener('resize', resize);
 
 applySettings('init');
 camera.aspect = innerWidth / innerHeight;
@@ -235,17 +243,24 @@ function frame(now) {
     const g = armGesture.update(dt, state, { armed: quad.armed, grounded: quad.grounded });
     if (g) {
       handleEvent(g === 'arm' ? 'gestureArm' : 'disarm', state);
-      if (quad.armed === (g === 'arm')) toasts.show(g === 'arm' ? 'Armed (stick command)' : 'Disarmed (stick command)', 1500);
+      if (g === 'arm' && !quad.armed) armGesture.sticksLocked = false; // arming was refused
+      if (quad.armed === (g === 'arm')) {
+        toasts.show(g === 'arm' ? 'Armed (stick command): release the sticks to centre' : 'Disarmed (stick command)', 2200);
+      }
     }
-  } else armGesture.reset();
+  } else {
+    armGesture.reset();
+    if (!quad.armed) armGesture.sticksLocked = false;
+  }
   calibration.update();
 
   cmd.mode = flightMode;
   cmd.rates = settings.rates;
   cmd.angleMaxTilt = settings.angleMaxTilt;
-  cmd.roll = state.roll;
-  cmd.pitch = state.pitch;
-  cmd.yaw = state.yaw;
+  const locked = armGesture.sticksLocked;
+  cmd.roll = locked ? 0 : state.roll;
+  cmd.pitch = locked ? 0 : state.pitch;
+  cmd.yaw = locked ? 0 : state.yaw;
   cmd.thrust = shapeThrottle(state.throttle, {
     mode: flightMode,
     hoverAtCenter: settings.hoverAtCenter,
@@ -274,6 +289,8 @@ function frame(now) {
   drone.update(quad.motor, paused ? 0 : dt, camDist, rig.mode === 'fpv');
   lights.follow(renderPos);
   course.update(elapsed);
+  trees.update(elapsed);
+  grass.update(elapsed, camera.position);
   sound.update(paused ? 0 : quad.motor, quad.armed && !paused, rig.mode === 'fpv' ? 1 : camDist);
 
   if (rig.mode === 'los' && settings.losMarker) {

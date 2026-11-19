@@ -91,7 +91,19 @@ export const CONTACT = {
   levelRate: 6, // 1/s, how fast a grounded, idle quad settles flat
   levelBelowWeight: 0.8, // settle flat only while thrust < this fraction of weight
   groundSpinDamping: 25, // 1/s, angular velocity damping while settling
+  groundIdleLift: 0.5, // on the ground, sticks only act once thrust > this fraction of weight
   tumbleDamping: 1.5, // 1/s, angular damping of a disarmed quad in the air
+};
+
+// Extra collision spheres at the motors (props), in model units of the drawn
+// quad. They scale with the drawn size, so a bigger drone also collides with
+// its arms and props, not only with the sphere around its centre.
+export const PROBES = {
+  motor: 0.078, // motor offset on X and Z
+  motorY: -0.03, // motor height relative to the model origin
+  radius: 0.035, // roughly the prop disc
+  feetDepth: 0.07, // feet below the model origin (see drone/model.js)
+  inertiaK: 0.08, // radius of gyration, for the spin a prop strike causes
 };
 
 export const ANGLE_MODE = {
@@ -134,6 +146,7 @@ export const INPUT = {
   stickArmHold: 1.5, // s, hold both sticks in the bottom corners to arm (DJI style)
   stickArmThreshold: 0.6, // yaw/pitch/roll past this (round gamepad gates reach ~0.7 diagonally)
   stickArmThrottle: 0.2, // throttle below this (a round-gated diagonal reads ~0.12)
+  stickArmRelease: 0.15, // after arming, yaw/pitch/roll stay locked until all are within this of centre
   padTakeover: 0.08, // pad throttle must move this far to take over from the keyboard
   keyboardRamp: 5, // stick units per second for keyboard sticks
   keyboardThrottleRate: 0.6, // throttle units per second while W/S held

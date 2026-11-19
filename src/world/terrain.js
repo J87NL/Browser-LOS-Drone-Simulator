@@ -85,14 +85,36 @@ export function createTerrain(renderer) {
       .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nuniform float uFlat;')
+      .replace('#include <common>', `#include <common>
+        varying vec3 vWPos;
+        uniform float uFlat;
+        float gHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float gNoise(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          vec2 u = f * f * (3.0 - 2.0 * f);
+          return mix(mix(gHash(i), gHash(i + vec2(1.0, 0.0)), u.x), mix(gHash(i + vec2(0.0, 1.0)), gHash(i + vec2(1.0, 1.0)), u.x), u.y);
+        }`)
       .replace(
         '#include <map_fragment>',
         `#include <map_fragment>
-        float r = length(vWPos.xz);
+        vec2 wp = vWPos.xz;
+        float r = length(wp);
         float inField = 1.0 - smoothstep(uFlat - 12.0, uFlat, r);
-        float stripe = smoothstep(0.46, 0.54, abs(fract(vWPos.x / 14.0) - 0.5) * 2.0);
-        diffuseColor.rgb *= mix(1.0, mix(0.9, 1.08, stripe), inField);`,
+        // Mown stripes on the flying field.
+        float stripe = smoothstep(0.46, 0.54, abs(fract(wp.x / 14.0) - 0.5) * 2.0);
+        diffuseColor.rgb *= mix(1.0, mix(0.9, 1.08, stripe), inField);
+        // Multi-scale brightness and hue variation, so the texture never tiles visibly.
+        float n1 = gNoise(wp * 0.045);
+        float n2 = gNoise(wp * 0.21 + 17.0);
+        float n3 = gNoise(wp * 1.3 - 5.0);
+        diffuseColor.rgb *= 0.86 + n1 * 0.18 + n2 * 0.1 + n3 * 0.06;
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.18, 1.08, 0.7), smoothstep(0.55, 0.85, n2) * 0.45);
+        // A few thin, sun-dried patches, and a worn area around the pad and pilot spot.
+        float dry = smoothstep(0.68, 0.9, gNoise(wp * 0.05 + 41.0));
+        float worn = (1.0 - smoothstep(1.2, 3.2, length(wp))) * 0.5 + (1.0 - smoothstep(0.4, 1.4, length(wp - vec2(0.0, 6.0)))) * 0.45;
+        vec3 earth = vec3(0.32, 0.27, 0.17) * (0.85 + n3 * 0.3);
+        diffuseColor.rgb = mix(diffuseColor.rgb, earth, clamp(dry * 0.3 + worn * (0.6 + n3 * 0.4), 0.0, 0.7));`,
       );
   };
   const mesh = new THREE.Mesh(geo, mat);

@@ -216,9 +216,57 @@ describe('Quad flight model', () => {
     expect(fast.crashed).not.toBeNull();
     const slow = airborne();
     slow.vel.set(0, 0, -3);
-    for (let i = 0; i < 500; i++) slow.step(0.002, cmd({ thrust: hover }), w);
+    let maxBack = 0;
+    for (let i = 0; i < 500; i++) {
+      slow.step(0.002, cmd({ thrust: hover }), w);
+      maxBack = Math.max(maxBack, slow.vel.z);
+    }
     expect(slow.crashed).toBeNull();
-    expect(slow.vel.z).toBeGreaterThan(0);
+    expect(maxBack).toBeGreaterThan(0.15); // it bounced back (part of the impact goes into spin)
+    // (Afterwards it may lean on the wall: in acro a knock leaves it tilted.)
+  });
+
+  it('a bigger drawn drone collides with its arms: banked low, the arm touches first', () => {
+    const big = (size) => {
+      const q = new Quad(P);
+      q.setDrawScale(size);
+      q.reset(new Vector3(0, 0.5, 0));
+      q.quat.setFromAxisAngle(new Vector3(0, 0, 1), 0.7); // banked 40 deg
+      q.vel.set(0, -1, 0);
+      const w = flat();
+      for (let i = 0; i < 600; i++) q.step(0.002, cmd(), w);
+      return q;
+    };
+    const small = big(1);
+    const large = big(3);
+    expect(large.crashed).toBeNull();
+    // Both end up resting on the ground; while sinking the big one hit with its arm.
+    expect(large.lastImpact).toBeGreaterThan(0);
+    expect(small.crashed).toBeNull();
+  });
+
+  it('a prop strike at speed is a crash for a big drone, even if the centre stays clear', () => {
+    const q = new Quad(P);
+    q.setDrawScale(3);
+    q.reset(new Vector3(0, 0.3, 0));
+    q.quat.setFromAxisAngle(new Vector3(0, 0, 1), 0.9); // steep bank: arm well below the centre
+    q.vel.set(0, -8, 0);
+    let minCentreGap = Infinity;
+    for (let i = 0; i < 200 && !q.crashed; i++) {
+      q.step(0.002, cmd(), flat());
+      minCentreGap = Math.min(minCentreGap, q.pos.y - P.radius);
+    }
+    expect(q.crashed).not.toBeNull();
+    expect(minCentreGap).toBeGreaterThan(0.05);
+  });
+
+  it('a level landing at 3x size rests on the centre sphere as before', () => {
+    const q = new Quad(P);
+    q.setDrawScale(3);
+    q.reset(new Vector3(0, 0.5, 0));
+    for (let i = 0; i < 1000; i++) q.step(0.002, cmd(), flat());
+    expect(q.crashed).toBeNull();
+    expect(q.pos.y).toBeCloseTo(P.radius, 2);
   });
 
   it('angle mode recovers from inverted', () => {
@@ -236,6 +284,20 @@ describe('Quad flight model', () => {
     expect(v).toBeGreaterThan(20);
     expect(v).toBeLessThan(45);
     expect(GRAVITY).toBe(9.81);
+  });
+
+  it('armed on the ground at low throttle, full yaw/roll does not spin it', () => {
+    const q = new Quad(P);
+    q.reset(new Vector3(0, P.radius, 0));
+    q.armed = true;
+    const w = flat();
+    for (let i = 0; i < 1000; i++) q.step(0.002, cmd({ thrust: 0, yaw: -1, roll: 1, pitch: -1 }), w);
+    expect(q.omega.length()).toBeLessThan(0.01);
+    // At most a degree or two from the first step, before the contact registers.
+    expect(Math.abs(q.heading)).toBeLessThan(0.035);
+    // With take-off thrust the sticks work again.
+    for (let i = 0; i < 100; i++) q.step(0.002, cmd({ thrust: 0.6, yaw: 1 }), w);
+    expect(q.omega.y).toBeLessThan(-1);
   });
 
   it('disarmed: no thrust', () => {
