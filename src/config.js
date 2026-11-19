@@ -91,7 +91,6 @@ export const DEFAULT_PRESET = 'freestyle5';
 export const CONTACT = {
   friction: 6, // 1/s, tangential velocity damping while touching a surface
   restingSpeed: 0.5, // below this normal speed a contact does not bounce
-  landingNormalY: 0.7, // surfaces facing up more than this are landing surfaces (ground, pad, tops)
   levelRate: 6, // 1/s, how fast a grounded, idle quad settles flat
   levelBelowWeight: 0.8, // settle flat only while thrust < this fraction of weight
   groundSpinDamping: 25, // 1/s, angular velocity damping while settling

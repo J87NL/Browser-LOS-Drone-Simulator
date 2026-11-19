@@ -255,12 +255,47 @@ describe('Quad flight model', () => {
     expect(q.crashed).not.toBeNull();
 
     const pad = new CollisionWorld(() => 0);
-    pad.addBox({ x: 0, y: 0.025, z: 0, hx: 0.6, hy: 0.025, hz: 0.6 });
+    pad.addBox({ x: 0, y: 0.025, z: 0, hx: 0.6, hy: 0.025, hz: 0.6, landable: 'all' }); // as in course.js
     const l = new Quad(P);
     l.reset(new Vector3(0, 0.4, 0.3));
     l.vel.set(0, -3, -1.5); // firm landing with some forward speed
     for (let i = 0; i < 500; i++) l.step(0.002, cmd(), pad);
     expect(l.crashed).toBeNull();
+  });
+
+  it('dropping onto a tree crown from above is a crash (crowns are not landing surfaces)', () => {
+    const w = new CollisionWorld(() => -100);
+    w.addCylinder({ x: 0, z: 0, y0: 10, y1: 12, r: 1.5 }); // a crown band
+    const q = airborne(13);
+    q.vel.set(0, -4, 0);
+    for (let i = 0; i < 400 && !q.crashed; i++) q.step(0.002, cmd({ thrust: hover }), w);
+    expect(q.crashed).not.toBeNull();
+  });
+
+  it('skidding into the edge of the landable pad is not a crash', () => {
+    const w = new CollisionWorld(() => 0);
+    w.addBox({ x: 0, y: 0.025, z: 0, hx: 0.6, hy: 0.025, hz: 0.6, landable: 'all' });
+    const q = new Quad(P);
+    q.reset(new Vector3(0, P.radius, 1.5));
+    q.vel.set(0, 0, -3.5);
+    for (let i = 0; i < 600; i++) q.step(0.002, cmd(), w);
+    expect(q.crashed).toBeNull();
+  });
+
+  it('steep ground keeps the forgiving landing rule', () => {
+    const w = new CollisionWorld((x) => x * 1.3); // about 52 degrees: ground normal y < 0.7
+    const q = new Quad(P);
+    q.reset(new Vector3(0, P.radius + 0.3, 0));
+    q.vel.set(0, -1, -5); // grazing along the slope at 5 m/s
+    for (let i = 0; i < 300; i++) q.step(0.002, cmd(), w);
+    expect(q.crashed).toBeNull();
+  });
+
+  it('every preset has an obstacle crash speed below its landing crash speed', () => {
+    for (const p of Object.values(PRESETS)) {
+      expect(p.obstacleCrashSpeed, p.label).toBeGreaterThan(0);
+      expect(p.obstacleCrashSpeed, p.label).toBeLessThan(p.crashSpeed);
+    }
   });
 
   it('a bigger drawn drone collides with its arms: banked low, a motor/prop probe touches first', () => {

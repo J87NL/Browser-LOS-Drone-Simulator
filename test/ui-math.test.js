@@ -19,3 +19,21 @@ describe('wind arrow and flags', () => {
     }
   });
 });
+
+describe('flag banner collider', () => {
+  it('sits on the banner side of the pole and turns with the flag', async () => {
+    const { placeBanner } = await import('../src/world/course.js');
+    const { CollisionWorld } = await import('../src/physics/colliders.js');
+    const { Vector3 } = await import('three');
+    const w = new CollisionWorld(() => -100);
+    const collider = w.addBox({ x: 5, y: 2, z: 5, hx: 0.35, hy: 1.2, hz: 0.05, reach: 0.75 });
+    const flag = { rotation: { y: 0 }, userData: { collider, pole: { x: 5, z: 5 } } };
+    placeBanner(flag); // banner towards +X
+    expect(w.contacts(new Vector3(5.5, 2, 5), 0.07).length).toBe(1);
+    expect(w.contacts(new Vector3(4.5, 2, 5), 0.07).length).toBe(0); // empty side
+    flag.rotation.y = Math.PI / 2; // banner towards -Z
+    placeBanner(flag);
+    expect(w.contacts(new Vector3(5, 2, 4.5), 0.07).length).toBe(1);
+    expect(w.contacts(new Vector3(5.5, 2, 5), 0.07).length).toBe(0);
+  });
+});

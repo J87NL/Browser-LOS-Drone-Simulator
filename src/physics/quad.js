@@ -297,9 +297,9 @@ export class Quad {
       // and sliding along them. Hitting the side or underside of an obstacle
       // crashes at a much lower speed, and there the full speed counts, so
       // scraping along a post at speed is a crash too.
-      const landing = n.y > CONTACT.landingNormalY;
+      const landing = c.landing;
       const severity = landing ? impact : _vP.length();
-      const limit = landing ? p.crashSpeed : p.obstacleCrashSpeed;
+      const limit = landing ? p.crashSpeed : (p.obstacleCrashSpeed ?? p.crashSpeed);
       if (severity > limit) {
         this.crash(severity);
         return true;

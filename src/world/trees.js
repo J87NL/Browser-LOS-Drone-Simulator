@@ -69,13 +69,15 @@ const poplar = () => clusterGeometry([
 
 const VARIANTS = [
   // canopy geometry, canopy colour, trunk height, trunk radius, collider radius/top/bottom (in unit tree space)
-  // canopy: collision bands [y0, y1, radius] (unit tree) that follow the drawn crown.
-  { name: 'conifer', geo: coniferGeometry, color: '#2f5d34', trunkH: 1.2, trunkR: 0.16, canopyR: 1.3,
-    canopy: [[0.55, 1.5, 1.45], [1.5, 2.4, 1.2], [2.4, 3.3, 0.95], [3.3, 4.2, 0.65], [4.2, 5.0, 0.35]] },
-  { name: 'broadleaf', geo: broadleaf, color: '#4f7f35', trunkH: 2.3, trunkR: 0.2, canopyR: 1.8,
-    canopy: [[1.9, 2.4, 1.45], [2.4, 4.6, 1.95], [4.6, 5.1, 1.2]] },
-  { name: 'poplar', geo: poplar, color: '#5c8a3a', trunkH: 2.0, trunkR: 0.14, canopyR: 0.8,
-    canopy: [[1.5, 4.8, 0.85], [4.8, 6.4, 0.65]] },
+  // canopyR: size of the soft ground shadow. canopy: collision bands [y0, y1, radius]
+  // (unit tree) that follow the drawn crown, sized to its outer edge (cone rims, blob
+  // lobes) including the vertex jitter, so the visible foliage always collides.
+  { name: 'conifer', geo: coniferGeometry, color: '#2f5d34', trunkH: 1.2, trunkR: 0.16, canopyR: 1.1,
+    canopy: [[0.55, 1.5, 1.75], [1.5, 2.4, 1.45], [2.4, 3.3, 1.15], [3.3, 4.2, 0.85], [4.2, 5.0, 0.5]] },
+  { name: 'broadleaf', geo: broadleaf, color: '#4f7f35', trunkH: 2.3, trunkR: 0.2, canopyR: 1.5,
+    canopy: [[1.9, 2.4, 1.5], [2.4, 4.6, 2.05], [4.6, 5.1, 1.25]] },
+  { name: 'poplar', geo: poplar, color: '#5c8a3a', trunkH: 2.0, trunkR: 0.14, canopyR: 0.75,
+    canopy: [[1.5, 4.8, 0.98], [4.8, 6.4, 0.9]] },
 ];
 
 function keepOut(x, z, keepOutZones) {

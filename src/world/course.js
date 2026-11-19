@@ -11,6 +11,17 @@ export function flagYaw(wind) {
 
 const angleDelta = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
 
+/** Move a flag's banner collider to match its current rotation (banner along local +X). */
+export function placeBanner(flag) {
+  const c = flag.userData.collider;
+  const { x, z } = flag.userData.pole;
+  const yaw = flag.rotation.y;
+  c.cos = Math.cos(yaw);
+  c.sin = Math.sin(yaw);
+  c.x = x + Math.cos(yaw) * 0.35; // local +X in world is (cos, 0, -sin)
+  c.z = z - Math.sin(yaw) * 0.35;
+}
+
 function padTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = 256;
@@ -64,12 +75,12 @@ export function createCourse(scene, collision) {
     m.receiveShadow = true;
     return m;
   };
-  const box = (w, h, d, mat, x, y, z, yaw = 0, collide = true) => {
+  const box = (w, h, d, mat, x, y, z, yaw = 0, collide = true, landable = false) => {
     const mesh = shadow(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat));
     mesh.position.set(x, y, z);
     mesh.rotation.y = yaw;
     group.add(mesh);
-    if (collide) collision.addBox({ x, y, z, hx: w / 2, hy: h / 2, hz: d / 2, yaw });
+    if (collide) collision.addBox({ x, y, z, hx: w / 2, hy: h / 2, hz: d / 2, yaw, landable });
     return mesh;
   };
 
@@ -81,7 +92,8 @@ export function createCourse(scene, collision) {
   );
   pad.position.set(PAD.x, PAD.top / 2, PAD.z);
   group.add(pad);
-  collision.addBox({ x: PAD.x, y: PAD.top / 2, z: PAD.z, hx: PAD.half, hy: PAD.top / 2, hz: PAD.half });
+  // Every face of the low pad is a landing surface: skidding into its edge is not a crash.
+  collision.addBox({ x: PAD.x, y: PAD.top / 2, z: PAD.z, hx: PAD.half, hy: PAD.top / 2, hz: PAD.half, landable: 'all' });
 
   // --- Gates: square frames on short legs. [x, z, yaw, colour]
   const gates = [
@@ -158,8 +170,12 @@ export function createCourse(scene, collision) {
     group.add(flag);
     flags.push(flag);
     collision.addCylinder({ x, z, y0, y1: y0 + 3.2, r: 0.05 }); // pole
-    // The banner turns with the wind around the pole: collide with the whole circle it can be in.
-    collision.addCylinder({ x, z, y0: y0 + 0.75, y1: y0 + 3.15, r: 0.72 });
+    // The banner: a thin box that follows the flag's rotation (see update()).
+    flag.userData.collider = collision.addBox({
+      x, y: y0 + 1.95, z, hx: 0.35, hy: 1.2, hz: 0.05, reach: 0.75,
+    });
+    flag.userData.pole = { x, z };
+    placeBanner(flag);
   }
 
   // --- Dive tower: scaffold with a platform, good for LOS power loops.
@@ -176,7 +192,7 @@ export function createCourse(scene, collision) {
       box(w, 0.1, 0.1, steel, tx, y0 + yy, tz + w / 2);
     }
     const deck = new THREE.MeshStandardMaterial({ color: '#c9772b', roughness: 0.7 });
-    box(w + 0.4, 0.15, w + 0.4, deck, tx, y0 + h, tz);
+    box(w + 0.4, 0.15, w + 0.4, deck, tx, y0 + h, tz, 0, true, 'top'); // you may land on the deck
   }
 
   // --- Hay bales
@@ -187,7 +203,7 @@ export function createCourse(scene, collision) {
   ];
   for (const [x, z, yaw, level = 0] of bales) {
     const y0 = terrainHeight(x, z);
-    box(1.2, 0.8, 0.8, hay, x, y0 + 0.4 + level * 0.8, z, yaw);
+    box(1.2, 0.8, 0.8, hay, x, y0 + 0.4 + level * 0.8, z, yaw, true, 'top'); // landable on top
   }
 
   scene.add(group);
@@ -208,6 +224,7 @@ export function createCourse(scene, collision) {
       for (const f of flags) {
         if (ws > 0.3) {
           f.rotation.y += angleDelta(f.rotation.y, flagYaw(wind)) * turn;
+          placeBanner(f);
         }
         f.rotation.z = Math.sin(t * (1.3 + ws * 0.5) + f.userData.phase) * (0.04 + ws * 0.01);
       }

@@ -3,6 +3,7 @@
 import { Vector3 } from 'three';
 
 const CELL = 8;
+const LANDING_NORMAL_Y = 0.7; // faces pointing up more than this count as the top
 const key = (cx, cz) => cx * 73856093 + cz * 19349663;
 
 export class CollisionWorld {
@@ -15,20 +16,26 @@ export class CollisionWorld {
     this.colliders = [];
     this._stamp = 0;
     this._contacts = [];
-    for (let i = 0; i < 16; i++) this._contacts.push({ normal: new Vector3(), depth: 0, ground: false });
+    for (let i = 0; i < 16; i++) this._contacts.push({ normal: new Vector3(), depth: 0, ground: false, landing: false });
   }
 
-  /** Axis-aligned box rotated by `yaw` (radians) around its vertical axis. hx/hy/hz are half sizes. */
-  addBox({ x, y, z, hx, hy, hz, yaw = 0 }) {
-    const c = { type: 'box', x, y, z, hx, hy, hz, cos: Math.cos(yaw), sin: Math.sin(yaw), enabled: true, stamp: 0 };
-    const reach = Math.hypot(hx, hz);
+  /**
+   * Axis-aligned box rotated by `yaw` (radians) around its vertical axis. hx/hy/hz are half sizes.
+   * `landable`: 'top' = its top is a landing surface (forgiving crash rule),
+   * 'all' = every face is (e.g. the low launch pad you may skid into),
+   * false = an obstacle everywhere. `reach` widens the grid footprint for a
+   * collider that will be moved around later (a flag that turns with the wind).
+   */
+  addBox({ x, y, z, hx, hy, hz, yaw = 0, landable = false, reach = 0 }) {
+    const c = { type: 'box', x, y, z, hx, hy, hz, cos: Math.cos(yaw), sin: Math.sin(yaw), landable, enabled: true, stamp: 0 };
+    reach = Math.max(reach, Math.hypot(hx, hz));
     this._insert(c, x - reach, z - reach, x + reach, z + reach);
     return c;
   }
 
   /** Vertical cylinder from y0 to y1. */
-  addCylinder({ x, z, y0, y1, r }) {
-    const c = { type: 'cyl', x, z, y0, y1, r, enabled: true, stamp: 0 };
+  addCylinder({ x, z, y0, y1, r, landable = false }) {
+    const c = { type: 'cyl', x, z, y0, y1, r, landable, enabled: true, stamp: 0 };
     this._insert(c, x - r, z - r, x + r, z + r);
     return c;
   }
@@ -55,17 +62,20 @@ export class CollisionWorld {
   /**
    * All contacts of a sphere. The returned array and its objects are reused
    * between calls; copy what you need.
-   * @returns {{normal:Vector3, depth:number, ground:boolean}[]}
+   * @returns {{normal:Vector3, depth:number, ground:boolean, landing:boolean}[]}
+   *   landing: the contact is on a landing surface (the ground, or a landable face).
    */
   contacts(pos, radius) {
     const out = [];
     let n = 0;
+    let landable = false; // of the collider being tested
     const push = (nx, ny, nz, depth, ground) => {
       if (n >= this._contacts.length) return;
       const c = this._contacts[n++];
       c.normal.set(nx, ny, nz);
       c.depth = depth;
       c.ground = ground;
+      c.landing = ground || landable === 'all' || (landable === 'top' && ny > LANDING_NORMAL_Y);
       out.push(c);
     };
 
@@ -73,6 +83,7 @@ export class CollisionWorld {
     const gh = this.heightFn(pos.x, pos.z);
     if (pos.y - radius < gh) {
       const gn = this.groundNormal(pos.x, pos.z);
+      landable = false;
       push(gn.x, gn.y, gn.z, (gh + radius - pos.y) * gn.y, true);
     }
 
@@ -89,6 +100,7 @@ export class CollisionWorld {
         for (const c of list) {
           if (c.stamp === stamp || !c.enabled) continue;
           c.stamp = stamp;
+          landable = c.landable;
           if (c.type === 'box') this._box(c, pos, radius, push);
           else this._cyl(c, pos, radius, push);
         }
