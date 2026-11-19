@@ -40,6 +40,12 @@ export class CameraRig {
     this.setPilot(px, pz);
   }
 
+  /** Stand a few metres behind the drone (never right under it). */
+  setPilotBehind(pos, heading) {
+    const d = CAMERA.pilotBehind;
+    this.setPilot(pos.x + Math.sin(heading) * d, pos.z + Math.cos(heading) * d);
+  }
+
   setPilot(x, z) {
     this.pilot.set(x, this.groundHeight(x, z) + CAMERA.pilotEyeHeight, z);
     this.snap = true;
@@ -75,14 +81,14 @@ export class CameraRig {
       cam.lookAt(this.lookTarget);
       const dist = this.pilot.distanceTo(pos) / scale;
       const target = settings.losAutoZoom ? losFov(dist) : CAMERA.losFixedFov;
-      fov = this.snap ? target : this.fov + (target - this.fov) * damp(5, dt);
+      fov = this.snap ? target : this.fov + (target - this.fov) * damp(CAMERA.losZoomSmoothing, dt);
     } else if (this.mode === 'chase') {
       if (this.snap) this.chaseYaw = heading;
       this.chaseYaw += wrapAngle(heading - this.chaseYaw) * damp(CAMERA.chaseYawLag, dt);
       _fwd.set(-Math.sin(this.chaseYaw), 0, -Math.cos(this.chaseYaw));
       _v.copy(pos)
-        .addScaledVector(_fwd, -CAMERA.chaseDistance * scale)
-        .add({ x: 0, y: CAMERA.chaseHeight * scale, z: 0 });
+        .addScaledVector(_fwd, -CAMERA.chaseDistance * scale);
+      _v.y += CAMERA.chaseHeight * scale;
       if (this.snap) this.chasePos.copy(_v);
       this.chasePos.lerp(_v, damp(CAMERA.chasePosLag, dt));
       const minY = this.groundHeight(this.chasePos.x, this.chasePos.z) + 0.25;
@@ -91,7 +97,7 @@ export class CameraRig {
       cam.up.set(0, 1, 0);
       _v.copy(pos).addScaledVector(_fwd, 1.2 * scale);
       cam.lookAt(_v);
-      fov = 75;
+      fov = CAMERA.chaseFov;
     } else {
       _v.set(0, 0.02, -0.05).multiplyScalar(scale).applyQuaternion(quat);
       cam.position.copy(pos).add(_v);

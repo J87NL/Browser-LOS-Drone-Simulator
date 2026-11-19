@@ -31,8 +31,9 @@ npm run build
 
 Checks: `npm test` (Vitest unit tests) and `npm run lint` (ESLint).
 
-The repo has an `.npmrc` with `legacy-peer-deps=true`. Without it, some npm 10 versions crash
-resolving Vite's optional peer dependencies.
+The repo has an `.npmrc` with `legacy-peer-deps=true`. Without it, npm 10.9 crashed during
+`npm install` with "Cannot read properties of null (reading 'edgesOut')" while resolving Vite's
+optional peer dependencies.
 
 ## Controls
 
@@ -64,7 +65,7 @@ resolving Vite's optional peer dependencies.
 - **LOS** (default): you stand 1.7 m tall a few metres behind the pad and look at the quad.
   Auto-zoom narrows the field of view (70° to 25°) as it flies away, so it stays visible. When the
   quad is far away a ring with its distance is drawn around it; if it gets off screen an arrow points
-  to it. Press P (or the mapped button) to walk to where the quad is.
+  to it. Press P (or the mapped button) to walk over: you then stand 5 m behind the quad, looking at its tail.
 - **Chase**: behind and above, follows yaw with some lag but not roll or pitch.
 - **FPV**: on the quad, uptilt 25° and 110° horizontal FOV by default (both in Settings).
 
@@ -100,6 +101,7 @@ learning). Turn it off to get the plain linear range in angle mode as well.
 
 - EdgeTX/OpenTX radios in **USB Joystick (HID)** mode show up as ordinary joysticks and work in
   Chromium/Chrome and Firefox. Choose "USB Joystick" on the radio when you plug it in.
+- If the controller disconnects while armed, the quad disarms (failsafe).
 - Browsers sometimes only report a controller after you press a button or move a stick on it.
 - **Snap-packaged browsers** on Ubuntu (Firefox and Chromium are snaps by default) may not see
   joysticks because of the sandbox. Connect the joystick interface:
@@ -133,7 +135,7 @@ mappings are kept; reset those per device in the setup screen).
 
 ## Flight model
 
-`src/physics/quad.js`, constants in `src/config.js` (all tuning lives there).
+`src/physics/quad.js`. The tuning constants (flight presets, contact behaviour, camera, input, world) are in `src/config.js`.
 
 - Fixed 500 Hz steps with an accumulator; a frame is capped at 0.1 s so a long pause cannot cause a
   spiral of death. Rendering interpolates between the last two physics states.
@@ -143,7 +145,8 @@ mappings are kept; reset those per device in the setup screen).
   plane, so the quad carves through turns instead of sliding.
 - Acro: sticks give a target rate through Betaflight actual rates; the actual angular velocity
   follows with a first-order response (about 30 ms), standing in for a tuned PID loop.
-- Angle mode: sticks give a target tilt relative to the current heading; yaw stays rate based.
+- Angle mode: sticks give a target tilt relative to the current heading (a corner stick is capped at
+  max tilt too); yaw stays rate based, about the world vertical so turning does not cost tilt.
 - Collisions: the quad is a sphere against the heightfield ground, boxes and vertical cylinders
   (gates, poles, trees, tower). A grounded quad with low thrust settles flat on its feet.
 

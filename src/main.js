@@ -94,22 +94,31 @@ gamepads.addEventListener('connect', (e) => {
     calibration.show(e.detail.id);
   }
 });
-gamepads.addEventListener('disconnect', (e) => toasts.show(`Controller disconnected: ${e.detail.id}`, 4000));
+gamepads.addEventListener('disconnect', (e) => {
+  // Failsafe: losing the controller mid-flight disarms instead of silently
+  // dropping to keyboard throttle.
+  const failsafe = quad.armed && input.state.source === 'gamepad';
+  if (failsafe) quad.armed = false;
+  toasts.show(`Controller disconnected${failsafe ? ' (failsafe: disarmed)' : ''}: ${e.detail.id}`, 4000);
+});
 
 function applySettings(key) {
-  if (key === 'preset' || key === 'all') {
+  const all = key === 'all' || key === 'init';
+  if (all || key === 'preset') {
     quad.setParams(preset());
     drone.root.scale.setScalar(preset().modelScale);
     resetDrone();
   }
-  const low = settings.lowQuality;
-  lights.setShadows(!low);
-  trees.setShadows(!low);
-  trees.setCount(low ? WORLD.treeCountLow : WORLD.treeCountHigh);
-  renderer.setPixelRatio(Math.min(devicePixelRatio, low ? 1 : 2));
-  renderer.setSize(innerWidth, innerHeight);
-  debug.setVisible(settings.showDebug);
-  sound.setVolume(settings.volume);
+  if (all || key === 'lowQuality') {
+    const low = settings.lowQuality;
+    lights.setShadows(!low);
+    trees.setShadows(!low);
+    trees.setCount(low ? WORLD.treeCountLow : WORLD.treeCountHigh);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, low ? 1 : 2));
+    renderer.setSize(innerWidth, innerHeight);
+  }
+  if (all || key === 'showDebug') debug.setVisible(settings.showDebug);
+  if (all || key === 'volume') sound.setVolume(settings.volume);
   saveSettings(settings);
 }
 
@@ -156,7 +165,7 @@ function handleEvent(ev, state) {
       resetDrone();
       break;
     case 'pilot':
-      rig.setPilot(quad.pos.x, quad.pos.z);
+      rig.setPilotBehind(quad.pos, quad.heading);
       toasts.show('Pilot position set here', 1500);
       break;
   }
@@ -179,7 +188,7 @@ window.addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-applySettings('preset');
+applySettings('init');
 camera.aspect = innerWidth / innerHeight;
 
 // --- Loop ------------------------------------------------------------------------------

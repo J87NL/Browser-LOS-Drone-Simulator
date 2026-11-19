@@ -3,16 +3,14 @@
 //   roll right  = negative rotation about body +Z
 //   pitch down  = negative rotation about body +X (stick forward)
 //   yaw right   = negative rotation about body +Y
-import { Vector3, Quaternion, Euler } from 'three';
-import { GRAVITY, CONTACT } from '../config.js';
+import { Vector3, Quaternion } from 'three';
+import { GRAVITY, CONTACT, ANGLE_MODE, MOTOR } from '../config.js';
 import { actualRateRad } from './rates.js';
 
 const UP = new Vector3(0, 1, 0);
-const FWD = new Vector3(0, 0, -1);
 
 // Scratch objects (the step runs 500 times a second, avoid allocation).
 const _up = new Vector3();
-const _fwd = new Vector3();
 const _force = new Vector3();
 const _vH = new Vector3();
 const _axis = new Vector3();
@@ -21,7 +19,8 @@ const _qInv = new Quaternion();
 const _qDes = new Quaternion();
 const _qYaw = new Quaternion();
 const _upDes = new Vector3();
-const _euler = new Euler(0, 0, 0, 'YXZ');
+const _tiltAxis = new Vector3();
+const _yawW = new Vector3();
 const _tan = new Vector3();
 
 export class Quad {
@@ -102,13 +101,13 @@ export class Quad {
       this.omega.lerp(t, 1 - Math.exp(-dt / p.rateTau));
     } else {
       t.set(0, 0, 0);
-      this.omega.multiplyScalar(Math.exp(-dt * 1.5)); // free tumble with a little air damping
+      this.omega.multiplyScalar(Math.exp(-dt * CONTACT.tumbleDamping)); // free tumble, a little air damping
     }
 
     // --- Thrust with motor lag -----------------------------------------
     const desired = this.armed ? Math.min(1, Math.max(0, cmd.thrust)) * this.maxThrust : 0;
     this.thrust += (desired - this.thrust) * (1 - Math.exp(-dt / p.motorTau));
-    const idle = this.armed ? 0.08 : 0;
+    const idle = this.armed ? MOTOR.idle : 0;
     const motorTarget = Math.max(idle, this.thrust / this.maxThrust);
     this.motor += (motorTarget - this.motor) * (1 - Math.exp(-dt / (this.armed ? 0.03 : 0.4)));
 
@@ -140,19 +139,28 @@ export class Quad {
     if (world) this._collide(dt, world);
   }
 
+  /**
+   * Heading = the twist of the attitude about world Y (swing/twist
+   * decomposition). Unlike projecting the nose onto the ground, this does not
+   * jump 180° during a pitch flip. Held when the twist is undefined.
+   */
   _updateHeading() {
-    _fwd.copy(FWD).applyQuaternion(this.quat);
-    const len = Math.hypot(_fwd.x, _fwd.z);
-    if (len > 0.2) this.heading = Math.atan2(-_fwd.x, -_fwd.z);
+    const q = this.quat;
+    if (q.y * q.y + q.w * q.w > 1e-4) this.heading = 2 * Math.atan2(q.y, q.w);
   }
 
   _angleModeTargets(cmd, t) {
     const p = this.params;
     const maxTilt = ((cmd.angleMaxTilt ?? p.angleMaxTilt) * Math.PI) / 180;
-    // Desired attitude relative to the current heading.
+    // Desired tilt relative to the current heading, as one rotation about a
+    // horizontal axis so a corner stick never exceeds max tilt.
+    const mag = Math.min(1, Math.hypot(cmd.pitch, cmd.roll));
+    if (mag > 1e-6) {
+      _tiltAxis.set(-cmd.pitch, 0, -cmd.roll).divideScalar(Math.hypot(cmd.pitch, cmd.roll));
+      _qDes.setFromAxisAngle(_tiltAxis, mag * maxTilt);
+    } else _qDes.identity();
     _qYaw.setFromAxisAngle(UP, this.heading);
-    _euler.set(-cmd.pitch * maxTilt, 0, -cmd.roll * maxTilt, 'YXZ');
-    _qDes.setFromEuler(_euler).premultiply(_qYaw);
+    _qDes.premultiply(_qYaw);
     _upDes.copy(UP).applyQuaternion(_qDes);
 
     const up = this.up(_up);
@@ -168,10 +176,12 @@ export class Quad {
     }
     _qInv.copy(this.quat).invert();
     _axis.applyQuaternion(_qInv); // world -> body
-    const maxRate = 12; // rad/s
-    const gain = Math.min(maxRate, angle * p.angleGain);
+    const gain = Math.min(ANGLE_MODE.maxRate, angle * p.angleGain);
     t.copy(_axis).multiplyScalar(gain);
-    t.y += -actualRateRad(cmd.yaw, cmd.rates.yaw);
+    // Yaw is a rate about world up (not body up), so turning does not drag
+    // the tilt away from its target.
+    _yawW.set(0, -actualRateRad(cmd.yaw, cmd.rates.yaw), 0).applyQuaternion(_qInv);
+    t.add(_yawW);
   }
 
   _collide(dt, world) {
@@ -204,7 +214,7 @@ export class Quad {
     }
 
     // A grounded quad that is not producing lift settles flat on its feet.
-    if (groundNormal && this.thrust < 0.8 * p.mass * GRAVITY) {
+    if (groundNormal && this.thrust < CONTACT.levelBelowWeight * p.mass * GRAVITY) {
       const up = this.up(_up);
       _axis.crossVectors(up, groundNormal);
       const s = _axis.length();
@@ -214,7 +224,7 @@ export class Quad {
         _dq.setFromAxisAngle(_axis, angle * (1 - Math.exp(-CONTACT.levelRate * dt)));
         this.quat.premultiply(_dq).normalize();
       }
-      this.omega.multiplyScalar(Math.exp(-25 * dt));
+      this.omega.multiplyScalar(Math.exp(-CONTACT.groundSpinDamping * dt));
     }
   }
 

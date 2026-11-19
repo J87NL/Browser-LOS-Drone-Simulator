@@ -1,6 +1,6 @@
 // Settings panel (Esc). Edits the settings object in place and reports changes.
 import { h } from './dom.js';
-import { PRESETS, DEFAULT_SETTINGS } from '../config.js';
+import { PRESETS, DEFAULT_SETTINGS, SETTING_RANGES as R } from '../config.js';
 
 const AXES = ['roll', 'pitch', 'yaw'];
 
@@ -108,7 +108,7 @@ export class SettingsPanel {
     );
 
     const vol = h('input', {
-      type: 'range', min: 0, max: 1, step: 0.05, value: s.volume,
+      type: 'range', min: R.volume[0], max: R.volume[1], step: 0.05, value: s.volume,
       oninput: () => {
         s.volume = Number(vol.value);
         this.cb.onChange('volume');
@@ -127,14 +127,14 @@ export class SettingsPanel {
             h('table', { class: 'rates' },
               h('thead', {}, h('tr', {}, h('th'), h('th', { text: 'center °/s' }), h('th', { text: 'max °/s' }), h('th', { text: 'expo' }))),
               h('tbody', {}, rateRows)),
-            this._num('Angle mode max tilt', 'angleMaxTilt', { min: 10, max: 80, step: 1, unit: '°' }, () => s.angleMaxTilt, (v) => (s.angleMaxTilt = v)),
-            this._num('Throttle expo', 'throttleExpo', { min: 0, max: 1, step: 0.05 }, () => s.throttleExpo, (v) => (s.throttleExpo = v)),
+            this._num('Angle mode max tilt', 'angleMaxTilt', { min: R.angleMaxTilt[0], max: R.angleMaxTilt[1], step: 1, unit: '°' }, () => s.angleMaxTilt, (v) => (s.angleMaxTilt = v)),
+            this._num('Throttle expo', 'throttleExpo', { min: R.throttleExpo[0], max: R.throttleExpo[1], step: 0.05 }, () => s.throttleExpo, (v) => (s.throttleExpo = v)),
             this._check('Throttle stick centers: mid stick = hover (angle mode)', 'hoverAtCenter'),
           ),
           h('section', {},
             h('h3', { text: 'Camera' }),
-            this._num('FPV camera uptilt', 'fpvUptilt', { min: -10, max: 60, step: 1, unit: '°' }, () => s.fpvUptilt, (v) => (s.fpvUptilt = v)),
-            this._num('FPV field of view', 'fpvFov', { min: 60, max: 150, step: 1, unit: '° horiz.' }, () => s.fpvFov, (v) => (s.fpvFov = v)),
+            this._num('FPV camera uptilt', 'fpvUptilt', { min: R.fpvUptilt[0], max: R.fpvUptilt[1], step: 1, unit: '°' }, () => s.fpvUptilt, (v) => (s.fpvUptilt = v)),
+            this._num('FPV field of view', 'fpvFov', { min: R.fpvFov[0], max: R.fpvFov[1], step: 1, unit: '° horiz.' }, () => s.fpvFov, (v) => (s.fpvFov = v)),
             this._check('LOS auto-zoom', 'losAutoZoom'),
             this._check('LOS marker when far or off-screen', 'losMarker'),
             h('h3', { text: 'Graphics & sound' }),

@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   applyDeadzone, normalizeStick, normalizeThrottle, modePreset, mapGamepad, defaultMapping,
-  AxisDetector, calibrationFromDetection, detectBinding, bindingActive, sanitizeMapping,
+  AxisDetector, calibrationFromDetection, detectBinding, bindingActive, sanitizeMapping, heldAtEnd,
 } from '../src/input/mapping.js';
-import { actionEvents } from '../src/input/input.js';
+import { actionEvents, InputManager } from '../src/input/input.js';
+import { GamepadManager } from '../src/input/gamepad.js';
 
 const pad = (axes, pressed = []) => ({
   axes,
@@ -91,6 +92,12 @@ describe('detection', () => {
     expect(cal).toMatchObject({ index: 1, invert: true, min: -0.98, max: 0.95 });
   });
 
+  it('only accepts a detection when the stick is held at an end', () => {
+    expect(heldAtEnd({ min: -1, max: 1, range: 2, last: 0.95 })).toBe(true);
+    expect(heldAtEnd({ min: -1, max: 1, range: 2, last: -0.6 })).toBe(true);
+    expect(heldAtEnd({ min: -1, max: 1, range: 2, last: 0.02 })).toBe(false);
+  });
+
   it('ignores excluded axes and tiny movements', () => {
     const d = new AxisDetector([1]);
     d.sample([0, -1, 0]);
@@ -147,5 +154,59 @@ describe('sanitizeMapping', () => {
   it('round-trips through JSON', () => {
     const m = defaultMapping(true, 3);
     expect(sanitizeMapping(JSON.parse(JSON.stringify(m)))).toEqual(m);
+  });
+});
+
+describe('InputManager', () => {
+  const fakePads = (getThrottleRaw) => {
+    const t = new EventTarget();
+    t.poll = () => {
+      const gp = pad([0, getThrottleRaw(), 0, 0]);
+      const mapping = defaultMapping(true);
+      return { id: 'pad', gp, mapping, mapped: mapGamepad(gp, mapping) };
+    };
+    return t;
+  };
+  const fakeKeyboard = () => ({ enabled: true, usedSticks: false, usedThrottle: false, throttle: 0, sticks: { yaw: 0, pitch: 0, roll: 0 }, update() {}, takeEvents: () => [] });
+
+  it('moving the gamepad throttle takes over from an earlier keyboard throttle', () => {
+    let raw = 0; // left stick centre = 50% throttle
+    const kb = fakeKeyboard();
+    const im = new InputManager(fakePads(() => raw), kb);
+    im.update(0.016);
+    kb.throttle = 0.4;
+    kb.usedThrottle = true;
+    expect(im.update(0.016).state.throttle).toBeCloseTo(0.4, 6);
+    raw = 1; // stick fully down
+    expect(im.update(0.016).state.throttle).toBe(0);
+    expect(kb.usedThrottle).toBe(false);
+  });
+
+  it('does not fire switch events for the switch position at connect', () => {
+    const t = new EventTarget();
+    const mapping = { ...defaultMapping(false), buttons: { arm: { type: 'axis', index: 4, dir: 1 } } };
+    let v = 1;
+    t.poll = () => {
+      const gp = pad([0, 1, 0, 1, v]);
+      return { id: 'radio', gp, mapping, mapped: mapGamepad(gp, mapping) };
+    };
+    const im = new InputManager(t, fakeKeyboard());
+    expect(im.update(0.016).events).toEqual([]);
+    v = -1;
+    expect(im.update(0.016).events).toEqual(['disarm']);
+    v = 1;
+    expect(im.update(0.016).events).toEqual(['arm']);
+  });
+});
+
+describe('GamepadManager storage', () => {
+  it('treats prototype-like device ids as plain keys', () => {
+    const gm = new GamepadManager();
+    expect(gm.hasMapping('__proto__')).toBe(false);
+    expect(gm.hasMapping('constructor')).toBe(false);
+    gm.setMapping('__proto__', defaultMapping(true));
+    expect(gm.hasMapping('__proto__')).toBe(true);
+    expect(gm.getMapping({ id: '__proto__', mapping: 'standard' })).toEqual(defaultMapping(true));
+    expect(gm.hasMapping('constructor')).toBe(false);
   });
 });

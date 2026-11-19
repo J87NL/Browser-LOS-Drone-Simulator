@@ -163,6 +163,11 @@ export class AxisDetector {
   }
 }
 
+/** True when the last sample sits within 25% of either end of the range. */
+export function heldAtEnd(r) {
+  return Math.min(Math.abs(r.last - r.min), Math.abs(r.last - r.max)) <= 0.25 * r.range;
+}
+
 /**
  * Build the calibration for a detected stick. The user ends the capture with
  * the stick held at its "positive" end (throttle up, yaw/roll right, pitch

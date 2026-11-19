@@ -22,9 +22,8 @@ export class Keyboard {
     this.usedThrottle = false;
     this.enabled = true;
     target.addEventListener('keydown', (e) => {
-      if (isTyping(e.target)) return;
+      if (isTyping(e.target) || !this.enabled) return; // dialogs keep normal keyboard behaviour
       if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
-      if (!this.enabled) return;
       this.down.add(e.code);
       if (!e.repeat && KEY_EVENTS[e.code]) this.events.push(KEY_EVENTS[e.code]);
     });

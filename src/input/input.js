@@ -32,6 +32,7 @@ export class InputManager {
     this.keyboard = keyboard;
     this.prevActions = null;
     this.prevKey = '';
+    this.prevPadThrottle = null;
     this.enabled = true;
     this.state = { throttle: 0, yaw: 0, pitch: 0, roll: 0, source: 'keyboard', gamepadId: null };
     gamepads.addEventListener('mappingchange', () => (this.prevActions = null));
@@ -57,13 +58,22 @@ export class InputManager {
       this.prevActions = { ...pad.mapped.actions };
       s.source = 'gamepad';
       s.gamepadId = pad.id;
+      // Whichever throttle moved last wins: moving the pad throttle hands
+      // control back from the keyboard.
+      if (this.prevPadThrottle != null && Math.abs(pad.mapped.throttle - this.prevPadThrottle) > 0.02) {
+        this.keyboard.usedThrottle = false;
+      }
+      if (this.prevPadThrottle == null || Math.abs(pad.mapped.throttle - this.prevPadThrottle) > 0.02) {
+        this.prevPadThrottle = pad.mapped.throttle;
+      }
       s.throttle = pad.mapped.throttle;
       s.yaw = pad.mapped.yaw;
       s.pitch = pad.mapped.pitch;
       s.roll = pad.mapped.roll;
-      if (this.keyboard.usedThrottle) s.throttle = Math.max(s.throttle, this.keyboard.throttle);
+      if (this.keyboard.usedThrottle) s.throttle = this.keyboard.throttle;
     } else {
       this.prevActions = null;
+      this.prevPadThrottle = null;
       s.source = 'keyboard';
       s.gamepadId = null;
       s.throttle = this.keyboard.throttle;

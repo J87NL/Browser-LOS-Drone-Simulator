@@ -1,6 +1,6 @@
 // localStorage helpers. Storage can be unavailable (private windows, blocked
 // site data); every access is wrapped so the sim still runs without it.
-import { DEFAULT_SETTINGS, PRESETS } from './config.js';
+import { DEFAULT_SETTINGS, PRESETS, SETTING_RANGES as RANGES } from './config.js';
 
 const SETTINGS_KEY = 'fpvsim.settings.v1';
 const MAPPINGS_KEY = 'fpvsim.mappings.v1';
@@ -23,7 +23,8 @@ export function writeJSON(key, value, storage = globalThis.localStorage) {
   }
 }
 
-const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
+const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 /** Merge stored settings over defaults, keeping only known keys of the right type. */
 export function mergeSettings(stored) {
@@ -37,12 +38,14 @@ export function mergeSettings(stored) {
       for (const axis of ['roll', 'pitch', 'yaw']) {
         for (const f of ['center', 'max', 'expo']) {
           const n = v[axis]?.[f];
-          if (Number.isFinite(n)) out.rates[axis][f] = n;
+          if (Number.isFinite(n)) out.rates[axis][f] = clamp(n, 0, f === 'expo' ? 1 : 2000);
         }
       }
     } else if (k === 'preset') {
-      if (typeof v === 'string' && PRESETS[v]) out.preset = v;
-    } else if (typeof v === typeof def && (typeof v !== 'number' || Number.isFinite(v))) {
+      if (typeof v === 'string' && Object.hasOwn(PRESETS, v)) out.preset = v;
+    } else if (typeof v === 'number' && typeof def === 'number') {
+      if (Number.isFinite(v)) out[k] = RANGES[k] ? clamp(v, RANGES[k][0], RANGES[k][1]) : v;
+    } else if (typeof v === typeof def) {
       out[k] = v;
     }
   }
@@ -59,7 +62,12 @@ export function saveSettings(s) {
 
 export function loadMappings() {
   const m = readJSON(MAPPINGS_KEY);
-  return isObj(m) && isObj(m.byId) ? m : { byId: {}, preferredId: null };
+  // Null-prototype map: device ids like "__proto__" are just keys.
+  const byId = Object.create(null);
+  if (isObj(m) && isObj(m.byId)) {
+    for (const [k, v] of Object.entries(m.byId)) Object.defineProperty(byId, k, { value: v, enumerable: true, writable: true, configurable: true });
+  }
+  return { byId, preferredId: isObj(m) && typeof m.preferredId === 'string' ? m.preferredId : null };
 }
 
 export function saveMappings(m) {

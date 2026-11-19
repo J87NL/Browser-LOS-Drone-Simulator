@@ -89,6 +89,17 @@ export const CONTACT = {
   friction: 6, // 1/s, tangential velocity damping while touching a surface
   restingSpeed: 0.5, // below this normal speed a contact does not bounce
   levelRate: 6, // 1/s, how fast a grounded, idle quad settles flat
+  levelBelowWeight: 0.8, // settle flat only while thrust < this fraction of weight
+  groundSpinDamping: 25, // 1/s, angular velocity damping while settling
+  tumbleDamping: 1.5, // 1/s, angular damping of a disarmed quad in the air
+};
+
+export const ANGLE_MODE = {
+  maxRate: 12, // rad/s, cap on the self-levelling rate
+};
+
+export const MOTOR = {
+  idle: 0.08, // visual/sound motor output when armed at zero throttle
 };
 
 export const ARM = {
@@ -97,6 +108,8 @@ export const ARM = {
 
 export const CAMERA = {
   pilotEyeHeight: 1.7,
+  pilotBehind: 5, // "pilot here" stands this far behind the drone
+  losZoomSmoothing: 5, // 1/s
   pilotStart: [0, 0, 6], // x, (ground), z: a few metres behind the launch pad
   losLookSmoothing: 14, // 1/s
   losZoomK: 2.5, // fov = 2*atan(K / distance), clamped below
@@ -106,6 +119,7 @@ export const CAMERA = {
   losFarDistance: 45, // show the marker beyond this distance
   chaseDistance: 2.6,
   chaseHeight: 0.9,
+  chaseFov: 75,
   chaseYawLag: 4, // 1/s
   chasePosLag: 8, // 1/s
   fpvUptilt: 25,
@@ -143,4 +157,13 @@ export const DEFAULT_SETTINGS = {
   lowQuality: false,
   volume: 0, // muted by default
   showDebug: false,
+};
+
+// Allowed ranges, shared by the settings panel and the storage loader.
+export const SETTING_RANGES = {
+  throttleExpo: [0, 1],
+  angleMaxTilt: [10, 80],
+  fpvUptilt: [-10, 60],
+  fpvFov: [60, 150],
+  volume: [0, 1],
 };

@@ -4,7 +4,7 @@
 import { h } from './dom.js';
 import {
   STICKS, ACTIONS, ACTION_LABELS, AxisDetector, calibrationFromDetection, detectBinding,
-  describeBinding, defaultMapping, modePreset, mapGamepad, snapshot,
+  describeBinding, defaultMapping, modePreset, mapGamepad, snapshot, heldAtEnd,
 } from '../input/mapping.js';
 
 const STICK_PROMPT = {
@@ -58,6 +58,8 @@ export class CalibrationScreen {
 
   close() {
     this._cancelCapture();
+    // Store the mapping even if unchanged, so "first connect" only happens once.
+    if (this.deviceId && this.mapping && !this.gamepads.hasMapping(this.deviceId)) this._save();
     this.el.classList.add('hidden');
     this.cb.onClose?.();
   }
@@ -94,9 +96,10 @@ export class CalibrationScreen {
 
   _startWizard(only = null) {
     const steps = only ? [only] : [...STICKS, 'center'];
-    // When detecting a single stick, the other sticks keep their axes.
-    const used = only ? STICKS.filter((s) => s !== only).map((s) => this.mapping.axes[s].index) : [];
-    this.wizard = { steps, i: 0, used, detector: new AxisDetector(used), message: '' };
+    // Guided setup excludes axes already found in this run. A single-stick
+    // detect may take any axis; it swaps with the stick that had it.
+    const used = [];
+    this.wizard = { steps, i: 0, used, single: !!only, detector: new AxisDetector(used), message: '' };
     this.listening = null;
     this.render();
   }
@@ -126,7 +129,18 @@ export class CalibrationScreen {
       this.render();
       return;
     }
-    const prevCenter = this.mapping.axes[step]?.index === r.index ? this.mapping.axes[step].center : null;
+    if (!heldAtEnd(r)) {
+      // Invert is read from where the stick is held, so it must be at an end.
+      w.message = 'Hold the stick at the end named above while you press Next.';
+      this.render();
+      return;
+    }
+    const prev = this.mapping.axes[step];
+    if (w.single) {
+      const other = STICKS.find((s) => s !== step && this.mapping.axes[s].index === r.index);
+      if (other) this.mapping.axes[other].index = prev?.index ?? -1;
+    }
+    const prevCenter = prev?.index === r.index ? prev.center : null;
     this.mapping.axes[step] = calibrationFromDetection(r, prevCenter);
     w.used.push(r.index);
     this._save();

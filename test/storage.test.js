@@ -18,6 +18,16 @@ describe('settings storage', () => {
     expect(s.rates.roll.expo).toBe(DEFAULT_SETTINGS.rates.roll.expo);
   });
 
+  it('rejects prototype keys as preset and clamps out-of-range numbers', () => {
+    const s = mergeSettings({ preset: 'constructor', fpvFov: 0, angleMaxTilt: 500, volume: 50, rates: { yaw: { center: -5, expo: 3 } } });
+    expect(s.preset).toBe(DEFAULT_SETTINGS.preset);
+    expect(s.fpvFov).toBe(60);
+    expect(s.angleMaxTilt).toBe(80);
+    expect(s.volume).toBe(1);
+    expect(s.rates.yaw.center).toBe(0);
+    expect(s.rates.yaw.expo).toBe(1);
+  });
+
   it('survives a throwing storage', () => {
     const bad = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('denied'); } };
     expect(readJSON('k', bad)).toBeNull();

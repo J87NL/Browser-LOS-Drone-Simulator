@@ -118,7 +118,7 @@ describe('Quad flight model', () => {
     expect(-q.omega.z / target).toBeCloseTo(1 - Math.exp(-1), 1);
   });
 
-  it('acro: a full roll returns to level and holds attitude when sticks centre', () => {
+  it('acro: after a full-rate roll, sticks centred stop rotation and hold attitude', () => {
     const q = airborne(50);
     // Full right roll for long enough to rotate ~360 deg at 670 deg/s.
     for (let i = 0; i < 260; i++) q.step(0.002, cmd({ thrust: 0.6, roll: 1 }));
@@ -152,6 +152,52 @@ describe('Quad flight model', () => {
     expect(q.up().x).toBeGreaterThan(0);
     for (let i = 0; i < 1000; i++) q.step(0.002, cmd({ mode: 'angle', thrust: 0.4 }));
     expect(q.up().y).toBeGreaterThan(0.9999);
+  });
+
+  it('angle mode keeps max tilt while yawing (yaw about world up)', () => {
+    const q = airborne(80);
+    const maxTilt = (P.angleMaxTilt * Math.PI) / 180;
+    for (let i = 0; i < 1500; i++) q.step(0.002, cmd({ mode: 'angle', thrust: 0.4, pitch: 1, yaw: 1 }));
+    expect(Math.abs(Math.acos(q.up().y) - maxTilt)).toBeLessThan((2 * Math.PI) / 180);
+  });
+
+  it('angle mode caps a corner stick at max tilt', () => {
+    const q = airborne(80);
+    const maxTilt = (P.angleMaxTilt * Math.PI) / 180;
+    for (let i = 0; i < 1500; i++) q.step(0.002, cmd({ mode: 'angle', thrust: 0.4, pitch: 1, roll: 1 }));
+    expect(Math.acos(q.up().y)).toBeLessThan(maxTilt + 0.02);
+    expect(q.up().x).toBeGreaterThan(0);
+    expect(q.up().z).toBeLessThan(0);
+  });
+
+  it('heading does not flip during an acro pitch flip', () => {
+    const q = airborne(80);
+    // Yaw to ~40 deg first, then a full pitch flip.
+    for (let i = 0; i < 100; i++) q.step(0.002, cmd({ thrust: hover, yaw: -0.5 }));
+    for (let i = 0; i < 100; i++) q.step(0.002, cmd({ thrust: hover }));
+    const h0 = q.heading;
+    let maxDev = 0;
+    for (let i = 0; i < 400; i++) {
+      q.step(0.002, cmd({ thrust: 0.5, pitch: 1 }));
+      const d = Math.abs(Math.atan2(Math.sin(q.heading - h0), Math.cos(q.heading - h0)));
+      maxDev = Math.max(maxDev, d);
+    }
+    expect(Math.abs(h0)).toBeGreaterThan(0.3);
+    expect(maxDev).toBeLessThan((10 * Math.PI) / 180);
+  });
+
+  it('crashes into an obstacle at speed but bounces off it gently', () => {
+    const w = new CollisionWorld(() => -100);
+    w.addBox({ x: 0, y: 20, z: -2, hx: 1, hy: 1, hz: 0.1 });
+    const fast = airborne();
+    fast.vel.set(0, 0, -12);
+    for (let i = 0; i < 200; i++) fast.step(0.002, cmd({ thrust: hover }), w);
+    expect(fast.crashed).not.toBeNull();
+    const slow = airborne();
+    slow.vel.set(0, 0, -3);
+    for (let i = 0; i < 500; i++) slow.step(0.002, cmd({ thrust: hover }), w);
+    expect(slow.crashed).toBeNull();
+    expect(slow.vel.z).toBeGreaterThan(0);
   });
 
   it('angle mode recovers from inverted', () => {
@@ -201,6 +247,14 @@ describe('CollisionWorld', () => {
     // Rotated 90 deg, the long side now runs along Z.
     expect(w.contacts(new Vector3(0, 0, 1.9), 0.1).length).toBe(1);
     expect(w.contacts(new Vector3(1.9, 0, 0), 0.1).length).toBe(0);
+  });
+
+  it('pushes a sphere whose centre is inside a box out through the nearest face', () => {
+    const w = new CollisionWorld(() => -100);
+    w.addBox({ x: 0, y: 0, z: 0, hx: 1, hy: 1, hz: 1 });
+    const c = w.contacts(new Vector3(0, 0.9, 0.2), 0.1);
+    expect(c[0].normal.y).toBe(1);
+    expect(c[0].depth).toBeCloseTo(0.2, 6);
   });
 
   it('skips disabled colliders', () => {

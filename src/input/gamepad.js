@@ -35,11 +35,11 @@ export class GamepadManager extends EventTarget {
   }
 
   hasMapping(id) {
-    return !!this.store.byId[id];
+    return Object.hasOwn(this.store.byId, id);
   }
 
   getMapping(gp) {
-    const stored = sanitizeMapping(this.store.byId[gp.id]);
+    const stored = this.hasMapping(gp.id) ? sanitizeMapping(this.store.byId[gp.id]) : null;
     return stored ?? defaultMapping(gp.mapping === 'standard');
   }
 
