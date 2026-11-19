@@ -163,9 +163,31 @@ export class AxisDetector {
   }
 }
 
-/** True when the last sample sits within 25% of either end of the range. */
-export function heldAtEnd(r) {
+/**
+ * True when the last sample sits within 25% of either end of the range. For a
+ * self-centring stick (`twoSided`) the stick must also have moved both ways,
+ * otherwise the centre would count as an "end".
+ */
+export function heldAtEnd(r, twoSided = false) {
+  if (twoSided && r.range < 1.2) return false;
   return Math.min(Math.abs(r.last - r.min), Math.abs(r.last - r.max)) <= 0.25 * r.range;
+}
+
+/**
+ * Put a detected axis on `step`. With `swap`, a stick that already used that
+ * axis gets the old axis of `step` with a neutral calibration (its own
+ * min/max/invert belonged to the other axis). Returns that stick's name, if any.
+ */
+export function assignDetectedAxis(mapping, step, det, swap) {
+  const prev = mapping.axes[step];
+  let swapped = null;
+  if (swap) {
+    swapped = STICKS.find((s) => s !== step && mapping.axes[s]?.index === det.index) ?? null;
+    if (swapped) mapping.axes[swapped] = { index: prev?.index ?? -1, invert: false, min: -1, max: 1, center: 0 };
+  }
+  const prevCenter = prev?.index === det.index ? prev.center : null;
+  mapping.axes[step] = calibrationFromDetection(det, prevCenter);
+  return swapped;
 }
 
 /**

@@ -63,14 +63,14 @@ export class GamepadManager extends EventTarget {
     for (const k of [...this.known]) {
       if (!ids.has(k)) {
         this.known.delete(k);
-        this.dispatchEvent(new CustomEvent('disconnect', { detail: { id: k.slice(k.indexOf(':') + 1) } }));
+        this.dispatchEvent(new CustomEvent('disconnect', { detail: { id: k.slice(k.indexOf(':') + 1), key: k } }));
       }
     }
     const gp = this.active();
     if (!gp) return null;
     const snap = snapshot(gp);
     const mapping = this.getMapping(gp);
-    return { id: gp.id, gp: snap, mapping, mapped: mapGamepad(snap, mapping) };
+    return { id: gp.id, key: `${gp.index}:${gp.id}`, gp: snap, mapping, mapped: mapGamepad(snap, mapping) };
   }
 
   _connected(gp) {
@@ -85,6 +85,6 @@ export class GamepadManager extends EventTarget {
   _disconnected(gp) {
     const k = `${gp.index}:${gp.id}`;
     if (!this.known.delete(k)) return;
-    this.dispatchEvent(new CustomEvent('disconnect', { detail: { id: gp.id } }));
+    this.dispatchEvent(new CustomEvent('disconnect', { detail: { id: gp.id, key: k } }));
   }
 }

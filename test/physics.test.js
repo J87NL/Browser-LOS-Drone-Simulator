@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { Vector3 } from 'three';
+import { Vector3, PerspectiveCamera } from 'three';
+import { CameraRig } from '../src/cameras.js';
 import { FixedStepper } from '../src/physics/stepper.js';
 import { Quad } from '../src/physics/quad.js';
 import { CollisionWorld } from '../src/physics/colliders.js';
@@ -184,6 +185,26 @@ describe('Quad flight model', () => {
     }
     expect(Math.abs(h0)).toBeGreaterThan(0.3);
     expect(maxDev).toBeLessThan((10 * Math.PI) / 180);
+  });
+
+  it('heading stays wrapped to (-pi, pi]', () => {
+    const q = airborne();
+    for (let i = 0; i < 3000; i++) {
+      q.step(0.002, cmd({ thrust: hover, yaw: 1 }));
+      expect(q.heading).toBeGreaterThan(-Math.PI - 1e-9);
+      expect(q.heading).toBeLessThanOrEqual(Math.PI + 1e-9);
+    }
+  });
+
+  it('"pilot here" stands behind the drone, not in front of it', () => {
+    const rig = new CameraRig(new PerspectiveCamera(), () => 0);
+    const q = airborne();
+    for (let i = 0; i < 300; i++) q.step(0.002, cmd({ thrust: hover, yaw: 0.6 }));
+    rig.setPilotBehind(q.pos, q.heading);
+    const nose = new Vector3(0, 0, -1).applyQuaternion(q.quat).setY(0).normalize();
+    const toPilot = rig.pilot.clone().sub(q.pos).setY(0);
+    expect(toPilot.length()).toBeCloseTo(5, 6);
+    expect(toPilot.normalize().dot(nose)).toBeLessThan(-0.99);
   });
 
   it('crashes into an obstacle at speed but bounces off it gently', () => {

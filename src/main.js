@@ -16,7 +16,7 @@ import { createDroneModel } from './drone/model.js';
 import { CameraRig, CAMERA_LABELS } from './cameras.js';
 import { GamepadManager } from './input/gamepad.js';
 import { Keyboard } from './input/keyboard.js';
-import { InputManager } from './input/input.js';
+import { InputManager, shouldFailsafe } from './input/input.js';
 import { MotorSound } from './audio.js';
 import { Hud } from './ui/hud.js';
 import { Toasts } from './ui/toast.js';
@@ -75,8 +75,19 @@ const toasts = new Toasts(ui);
 const marker = new LosMarker(ui);
 const debug = new DebugOverlay(ui);
 
+// New controllers that connected while the setup screen was already open.
+const pendingSetup = [];
 const calibration = new CalibrationScreen(ui, gamepads, {
-  onClose: () => {},
+  onClose: () => {
+    const connected = new Set(gamepads.list().map((g) => g.id));
+    while (pendingSetup.length) {
+      const id = pendingSetup.shift();
+      if (connected.has(id) && !gamepads.hasMapping(id)) {
+        setTimeout(() => calibration.show(id), 0);
+        break;
+      }
+    }
+  },
   toast: (t) => toasts.show(t),
 });
 const settingsPanel = new SettingsPanel(ui, settings, {
@@ -89,7 +100,9 @@ const settingsPanel = new SettingsPanel(ui, settings, {
 
 gamepads.addEventListener('connect', (e) => {
   toasts.show(`Controller connected: ${e.detail.id}`, 4000);
-  if (e.detail.firstTime && !calibration.open) {
+  if (!e.detail.firstTime) return;
+  if (calibration.open) pendingSetup.push(e.detail.id);
+  else {
     settingsPanel.close();
     calibration.show(e.detail.id);
   }
@@ -97,7 +110,7 @@ gamepads.addEventListener('connect', (e) => {
 gamepads.addEventListener('disconnect', (e) => {
   // Failsafe: losing the controller mid-flight disarms instead of silently
   // dropping to keyboard throttle.
-  const failsafe = quad.armed && input.state.source === 'gamepad';
+  const failsafe = shouldFailsafe(quad.armed, input.state, e.detail.key);
   if (failsafe) quad.armed = false;
   toasts.show(`Controller disconnected${failsafe ? ' (failsafe: disarmed)' : ''}: ${e.detail.id}`, 4000);
 });
@@ -166,7 +179,7 @@ function handleEvent(ev, state) {
       break;
     case 'pilot':
       rig.setPilotBehind(quad.pos, quad.heading);
-      toasts.show('Pilot position set here', 1500);
+      toasts.show('Pilot moved: 5 m behind the drone', 1500);
       break;
   }
 }

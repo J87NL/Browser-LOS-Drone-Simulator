@@ -91,13 +91,14 @@ export class SettingsPanel {
         h('th', { text: axis }),
         ...['center', 'max', 'expo'].map((f) => {
           const isExpo = f === 'expo';
+          const range = isExpo ? R.rateExpo : R.rate;
           const input = h('input', {
-            type: 'number', min: 0, max: isExpo ? 1 : 2000, step: isExpo ? 0.05 : 10, value: s.rates[axis][f],
+            type: 'number', min: range[0], max: range[1], step: isExpo ? 0.05 : 10, value: s.rates[axis][f],
             'aria-label': `${axis} ${f}`,
             onchange: () => {
               const v = Number(input.value);
               if (!Number.isFinite(v)) return;
-              s.rates[axis][f] = Math.min(isExpo ? 1 : 2000, Math.max(0, v));
+              s.rates[axis][f] = Math.min(range[1], Math.max(range[0], v));
               input.value = s.rates[axis][f];
               this.cb.onChange('rates');
             },

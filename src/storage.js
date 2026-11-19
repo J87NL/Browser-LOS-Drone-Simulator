@@ -38,7 +38,8 @@ export function mergeSettings(stored) {
       for (const axis of ['roll', 'pitch', 'yaw']) {
         for (const f of ['center', 'max', 'expo']) {
           const n = v[axis]?.[f];
-          if (Number.isFinite(n)) out.rates[axis][f] = clamp(n, 0, f === 'expo' ? 1 : 2000);
+          const [lo, hi] = f === 'expo' ? RANGES.rateExpo : RANGES.rate;
+          if (Number.isFinite(n)) out.rates[axis][f] = clamp(n, lo, hi);
         }
       }
     } else if (k === 'preset') {

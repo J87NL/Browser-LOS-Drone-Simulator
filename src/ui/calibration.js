@@ -3,8 +3,8 @@
 // assignment, and live raw/mapped bars. Changes are saved immediately.
 import { h } from './dom.js';
 import {
-  STICKS, ACTIONS, ACTION_LABELS, AxisDetector, calibrationFromDetection, detectBinding,
-  describeBinding, defaultMapping, modePreset, mapGamepad, snapshot, heldAtEnd,
+  STICKS, ACTIONS, ACTION_LABELS, AxisDetector, detectBinding,
+  describeBinding, defaultMapping, modePreset, mapGamepad, snapshot, heldAtEnd, assignDetectedAxis,
 } from '../input/mapping.js';
 
 const STICK_PROMPT = {
@@ -50,6 +50,7 @@ export class CalibrationScreen {
   }
 
   show(deviceId = null) {
+    this.openedFor = deviceId;
     const pads = this.gamepads.list();
     const pick = pads.find((g) => g.id === deviceId) ?? this.gamepads.active() ?? pads[0];
     this._selectDevice(pick?.id ?? null);
@@ -58,8 +59,12 @@ export class CalibrationScreen {
 
   close() {
     this._cancelCapture();
-    // Store the mapping even if unchanged, so "first connect" only happens once.
+    // Store mappings even if unchanged, so "first connect" only happens once:
+    // the selected device and the device the screen was opened for.
     if (this.deviceId && this.mapping && !this.gamepads.hasMapping(this.deviceId)) this._save();
+    const opened = this.gamepads.list().find((g) => g.id === this.openedFor);
+    if (opened && !this.gamepads.hasMapping(opened.id)) this.gamepads.setMapping(opened.id, this.gamepads.getMapping(opened));
+    this.openedFor = null;
     this.el.classList.add('hidden');
     this.cb.onClose?.();
   }
@@ -129,19 +134,15 @@ export class CalibrationScreen {
       this.render();
       return;
     }
-    if (!heldAtEnd(r)) {
-      // Invert is read from where the stick is held, so it must be at an end.
-      w.message = 'Hold the stick at the end named above while you press Next.';
+    if (!heldAtEnd(r, step !== 'throttle')) {
+      // Invert is read from where the stick is held, so it must be at an end
+      // (and a centring stick must have gone both ways).
+      w.message = 'Move the stick fully both ways, then hold it at the end named above while you press Next.';
       this.render();
       return;
     }
-    const prev = this.mapping.axes[step];
-    if (w.single) {
-      const other = STICKS.find((s) => s !== step && this.mapping.axes[s].index === r.index);
-      if (other) this.mapping.axes[other].index = prev?.index ?? -1;
-    }
-    const prevCenter = prev?.index === r.index ? prev.center : null;
-    this.mapping.axes[step] = calibrationFromDetection(r, prevCenter);
+    const swapped = assignDetectedAxis(this.mapping, step, r, w.single);
+    if (swapped) this.cb.toast(`${swapped} moved to the old axis of ${step}: run detect for ${swapped} next`);
     w.used.push(r.index);
     this._save();
     w.i++;

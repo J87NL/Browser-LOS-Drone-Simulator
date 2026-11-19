@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   applyDeadzone, normalizeStick, normalizeThrottle, modePreset, mapGamepad, defaultMapping,
-  AxisDetector, calibrationFromDetection, detectBinding, bindingActive, sanitizeMapping, heldAtEnd,
+  AxisDetector, calibrationFromDetection, detectBinding, bindingActive, sanitizeMapping, heldAtEnd, assignDetectedAxis,
 } from '../src/input/mapping.js';
-import { actionEvents, InputManager } from '../src/input/input.js';
+import { actionEvents, InputManager, shouldFailsafe } from '../src/input/input.js';
 import { GamepadManager } from '../src/input/gamepad.js';
 
 const pad = (axes, pressed = []) => ({
@@ -98,6 +98,25 @@ describe('detection', () => {
     expect(heldAtEnd({ min: -1, max: 1, range: 2, last: 0.02 })).toBe(false);
   });
 
+  it('a centring stick pushed only one way is rejected (centre is not an end)', () => {
+    const oneWay = { min: 0, max: 1, range: 1, last: 0 };
+    expect(heldAtEnd(oneWay, true)).toBe(false);
+    expect(heldAtEnd({ min: -1, max: 1, range: 2, last: 1 }, true)).toBe(true);
+    expect(heldAtEnd({ ...oneWay, last: 1 })).toBe(true); // throttle: one-sided is fine
+  });
+
+  it('single-stick detect swaps axes and gives the other stick a neutral calibration', () => {
+    const m = defaultMapping(true, 2); // throttle axis 1 (inverted), yaw axis 0
+    m.axes.yaw = { index: 0, invert: true, min: -0.7, max: 0.8, center: 0.1 };
+    const swapped = assignDetectedAxis(m, 'throttle', { index: 0, min: -1, max: 1, last: 1, range: 2 }, true);
+    expect(swapped).toBe('yaw');
+    expect(m.axes.yaw).toEqual({ index: 1, invert: false, min: -1, max: 1, center: 0 });
+    expect(m.axes.throttle).toMatchObject({ index: 0, invert: false });
+    const g = defaultMapping(true, 2);
+    expect(assignDetectedAxis(g, 'throttle', { index: 0, min: -1, max: 1, last: 1, range: 2 }, false)).toBeNull();
+    expect(g.axes.yaw.index).toBe(0); // guided setup does not swap
+  });
+
   it('ignores excluded axes and tiny movements', () => {
     const d = new AxisDetector([1]);
     d.sample([0, -1, 0]);
@@ -180,6 +199,42 @@ describe('InputManager', () => {
     raw = 1; // stick fully down
     expect(im.update(0.016).state.throttle).toBe(0);
     expect(kb.usedThrottle).toBe(false);
+  });
+
+  it('a W/S tap after the pad took over continues from the pad value', () => {
+    let raw = 0;
+    const kb = fakeKeyboard();
+    const im = new InputManager(fakePads(() => raw), kb);
+    im.update(0.016);
+    kb.throttle = 0.7;
+    kb.usedThrottle = true;
+    im.update(0.016);
+    raw = 1; // pad throttle to the bottom: takes over
+    expect(im.update(0.016).state.throttle).toBe(0);
+    kb.usedThrottle = true; // a tap on S
+    kb.throttle = Math.max(0, kb.throttle - 0.01);
+    expect(im.update(0.016).state.throttle).toBe(0);
+  });
+
+  it('pad stick noise does not take the throttle away from the keyboard', () => {
+    let raw = 0;
+    const kb = fakeKeyboard();
+    const im = new InputManager(fakePads(() => raw), kb);
+    im.update(0.016);
+    kb.throttle = 0.42;
+    kb.usedThrottle = true;
+    for (let i = 0; i < 2000; i++) {
+      raw = Math.sin(i * 1.7) * 0.06; // ±0.06 raw jitter around centre
+      expect(im.update(0.016).state.throttle).toBe(0.42);
+    }
+  });
+
+  it('failsafe only for the controller that is flying', () => {
+    const st = { source: 'gamepad', gamepadKey: '0:Radio' };
+    expect(shouldFailsafe(true, st, '0:Radio')).toBe(true);
+    expect(shouldFailsafe(true, st, '1:Xbox pad')).toBe(false);
+    expect(shouldFailsafe(false, st, '0:Radio')).toBe(false);
+    expect(shouldFailsafe(true, { source: 'keyboard', gamepadKey: null }, '0:Radio')).toBe(false);
   });
 
   it('does not fire switch events for the switch position at connect', () => {

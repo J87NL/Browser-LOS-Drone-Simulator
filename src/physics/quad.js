@@ -143,10 +143,17 @@ export class Quad {
    * Heading = the twist of the attitude about world Y (swing/twist
    * decomposition). Unlike projecting the nose onto the ground, this does not
    * jump 180° during a pitch flip. Held when the twist is undefined.
+   * Trade-off: while inverted or on knife edge, a body-yaw input barely
+   * changes this heading, so the chase camera does not follow it until the
+   * quad is upright again. Following the nose instead would bring back the
+   * 180° swing during pitch flips.
    */
   _updateHeading() {
     const q = this.quat;
-    if (q.y * q.y + q.w * q.w > 1e-4) this.heading = 2 * Math.atan2(q.y, q.w);
+    if (q.y * q.y + q.w * q.w > 1e-4) {
+      const h = 2 * Math.atan2(q.y, q.w);
+      this.heading = Math.atan2(Math.sin(h), Math.cos(h)); // wrap to (-π, π]
+    }
   }
 
   _angleModeTargets(cmd, t) {

@@ -1,8 +1,8 @@
-# LOS Quad Sim
+# LOS Drone Simulator
 
-A small quadcopter simulator for the browser, built so you can fly **line of sight**: you stand on the
-field and watch the quad, the way you would with a real one. Chase and FPV cameras are there too.
-It works with a USB gamepad or an RC transmitter in USB joystick mode, and with the keyboard.
+A browser quadcopter simulator for flying **line of sight** (LOS): you stand on the field and watch
+the quad with your own eyes, the way you learn on a real one. Chase and FPV cameras are there too.
+It works with a USB gamepad, an RC transmitter (EdgeTX/OpenTX in USB joystick mode) or the keyboard.
 
 Vite, vanilla JavaScript and three.js. The flight model is written by hand (no physics engine) and
 runs at a fixed 500 Hz, independent of the frame rate.
@@ -46,10 +46,12 @@ optional peer dependencies.
 | Camera mode (LOS → chase → FPV) | C | Y / Triangle |
 | Flight mode (angle ↔ acro) | M | X / Square |
 | Reset to the launch pad | R | B / Circle |
-| Put the pilot where the drone is | P | right bumper |
+| Move the pilot to 5 m behind the drone | P | right bumper |
 | Settings | Esc | |
 | Debug overlay | ` (backquote) | |
 
+- With a controller connected you can still use W/S: the throttle that moved last wins. A clear move
+  of the controller throttle (not stick jitter) takes it back, continuing from its position.
 - **Arming** needs the throttle low (below 5%). A self-centring gamepad throttle rests at 50%,
   so hold the stick down while you press arm.
 - You start in **angle mode** (self-levelling, max tilt 55° on the 5" preset). With "throttle stick
@@ -81,6 +83,9 @@ device id) in `localStorage`, so they survive a reload.
    move it through its full range a few times, then hold it at one end (throttle up, yaw right, pitch
    forward, roll right) and press **Next** (or Enter). The axis that moved most is taken, its min/max
    are recorded and invert is set from where you held it. The last step records the stick centres.
+   The "detect" button on a single row does the same for one stick. If the axis it finds belonged to
+   another stick, the two swap: that other stick gets a neutral calibration and you are asked to
+   detect it next. A self-centring stick must be moved both ways before Next is accepted.
 4. Fine-tune per axis: axis number, invert, min/center/max (type a value or press "set" to take
    the current stick position), and the deadzone (default 0.03).
 5. **Buttons and switches**: click assign next to an action, then press a button or flip a switch.
@@ -101,7 +106,8 @@ learning). Turn it off to get the plain linear range in angle mode as well.
 
 - EdgeTX/OpenTX radios in **USB Joystick (HID)** mode show up as ordinary joysticks and work in
   Chromium/Chrome and Firefox. Choose "USB Joystick" on the radio when you plug it in.
-- If the controller disconnects while armed, the quad disarms (failsafe).
+- If the controller you are flying with disconnects while armed, the quad disarms (failsafe).
+  Disconnecting another, idle controller does nothing.
 - Browsers sometimes only report a controller after you press a button or move a stick on it.
 - **Snap-packaged browsers** on Ubuntu (Firefox and Chromium are snaps by default) may not see
   joysticks because of the sandbox. Connect the joystick interface:

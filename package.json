@@ -1,8 +1,8 @@
 {
-  "name": "fpv-los-sim",
+  "name": "browser-los-drone-simulator",
   "private": true,
   "version": "0.1.0",
-  "description": "Browser quadcopter simulator with line-of-sight, chase and FPV cameras",
+  "description": "Browser quadcopter simulator for flying line of sight, with chase and FPV cameras",
   "type": "module",
   "engines": {
     "node": ">=20.19"

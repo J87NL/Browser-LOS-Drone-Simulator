@@ -129,6 +129,7 @@ export const CAMERA = {
 export const INPUT = {
   deadzone: 0.03,
   switchThreshold: 0.5,
+  padTakeover: 0.08, // pad throttle must move this far to take over from the keyboard
   keyboardRamp: 5, // stick units per second for keyboard sticks
   keyboardThrottleRate: 0.6, // throttle units per second while W/S held
 };
@@ -166,4 +167,6 @@ export const SETTING_RANGES = {
   fpvUptilt: [-10, 60],
   fpvFov: [60, 150],
   volume: [0, 1],
+  rate: [0, 2000], // deg/s, center and max
+  rateExpo: [0, 1],
 };

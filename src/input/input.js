@@ -1,5 +1,14 @@
 // Combines gamepad and keyboard into one stick state plus discrete events.
 import { ACTIONS } from './mapping.js';
+import { INPUT } from '../config.js';
+
+/**
+ * Failsafe: disarm only when the controller that is actually flying goes
+ * away (matched by index and id), not when some other pad disconnects.
+ */
+export function shouldFailsafe(armed, state, disconnectedKey) {
+  return armed && state.source === 'gamepad' && state.gamepadKey === disconnectedKey;
+}
 
 /**
  * Turn gamepad action levels into events. Buttons fire on press; switch axes
@@ -32,9 +41,9 @@ export class InputManager {
     this.keyboard = keyboard;
     this.prevActions = null;
     this.prevKey = '';
-    this.prevPadThrottle = null;
+    this.padAnchor = null;
     this.enabled = true;
-    this.state = { throttle: 0, yaw: 0, pitch: 0, roll: 0, source: 'keyboard', gamepadId: null };
+    this.state = { throttle: 0, yaw: 0, pitch: 0, roll: 0, source: 'keyboard', gamepadId: null, gamepadKey: null };
     gamepads.addEventListener('mappingchange', () => (this.prevActions = null));
   }
 
@@ -58,24 +67,31 @@ export class InputManager {
       this.prevActions = { ...pad.mapped.actions };
       s.source = 'gamepad';
       s.gamepadId = pad.id;
-      // Whichever throttle moved last wins: moving the pad throttle hands
-      // control back from the keyboard.
-      if (this.prevPadThrottle != null && Math.abs(pad.mapped.throttle - this.prevPadThrottle) > 0.02) {
-        this.keyboard.usedThrottle = false;
-      }
-      if (this.prevPadThrottle == null || Math.abs(pad.mapped.throttle - this.prevPadThrottle) > 0.02) {
-        this.prevPadThrottle = pad.mapped.throttle;
-      }
-      s.throttle = pad.mapped.throttle;
+      s.gamepadKey = pad.key;
+      // Whichever throttle moved last wins. While the pad has it, the keyboard
+      // throttle follows the pad so a W/S tap continues from the same value.
+      // The pad takes it back only after a clear move (not stick noise) away
+      // from where it was when the keyboard took over.
+      const pt = pad.mapped.throttle;
+      if (this.keyboard.usedThrottle) {
+        if (this.padAnchor == null) this.padAnchor = pt;
+        if (Math.abs(pt - this.padAnchor) > INPUT.padTakeover) {
+          this.keyboard.usedThrottle = false;
+          this.padAnchor = null;
+        }
+      } else this.padAnchor = null;
+      if (!this.keyboard.usedThrottle) this.keyboard.throttle = pt;
+      s.throttle = pt;
       s.yaw = pad.mapped.yaw;
       s.pitch = pad.mapped.pitch;
       s.roll = pad.mapped.roll;
       if (this.keyboard.usedThrottle) s.throttle = this.keyboard.throttle;
     } else {
       this.prevActions = null;
-      this.prevPadThrottle = null;
+      this.padAnchor = null;
       s.source = 'keyboard';
       s.gamepadId = null;
+      s.gamepadKey = null;
       s.throttle = this.keyboard.throttle;
       s.yaw = s.pitch = s.roll = 0;
     }
