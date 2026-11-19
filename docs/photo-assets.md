@@ -5,7 +5,7 @@
 | File | Source | Licence |
 | --- | --- | --- |
 | `sky.hdr` | Poly Haven, [Kloofendal 48d Partly Cloudy (Pure Sky)](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky), 2K HDR, unchanged | CC0 |
-| `ground_diff.jpg` | Poly Haven, [Leafy Grass](https://polyhaven.com/a/leafy_grass), 2K diffuse, recoloured from autumn brown towards lawn green (60% green tint on luminance, 40% original) and re-saved at JPEG quality 85 | CC0 |
+| `ground_diff.jpg` | Poly Haven, [Leafy Grass](https://polyhaven.com/a/leafy_grass), 2K diffuse, recoloured towards lawn green: `0.4 × original + 0.6 × (luminance / mean luminance) × 0.55 × RGB(0.42, 0.62, 0.25)`, then contrast × 1.1 (Pillow) and re-saved at JPEG quality 85 | CC0 |
 | `ground_nor.jpg` | same set, 2K `nor_gl`, re-saved at JPEG quality 90 | CC0 |
 | `ground_rough.jpg` | same set, 2K roughness, greyscale, re-saved at JPEG quality 85 | CC0 |
 
@@ -21,7 +21,7 @@ The normal and roughness maps are only used together with `ground_diff.jpg`.
 | File | What | Suggested source (CC0) |
 | --- | --- | --- |
 | `sky.hdr` | Equirectangular HDR of a sky without ground (2k is enough). Lights the scene, the sun direction is taken from its brightest spot. | Poly Haven "… puresky" HDRIs, e.g. `kloofendal_48d_partly_cloudy_puresky_2k.hdr` |
-| `ground_diff.jpg` | Grass colour map, tileable | Poly Haven or ambientCG grass textures (2k JPG); Poly Haven's grasses are autumn-coloured, ambientCG has green ones |
+| `ground_diff.jpg` | Grass colour map, tileable | Poly Haven or ambientCG grass textures (2k JPG); Poly Haven's Leafy Grass is fairly brown, ambientCG has greener ones |
 | `ground_nor.jpg` | Matching normal map (OpenGL convention) | same set (`_nor_gl`) |
 | `ground_rough.jpg` | Matching roughness map | same set (`_rough`) |
 
