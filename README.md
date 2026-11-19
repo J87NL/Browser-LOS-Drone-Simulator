@@ -26,8 +26,8 @@ Firefox works too.
 npm run build
 ```
 
-`dist/` is a static site with relative paths, so you can serve it from any folder on any static host
-(`npm run preview` serves it locally).
+The build goes to `public/`: a static site with relative paths (`index.html` plus `assets/`), so it
+works from any folder on any static host (`npm run preview` serves it locally). See [Deploying](#deploying).
 
 Checks: `npm test` (Vitest unit tests) and `npm run lint` (ESLint).
 
@@ -123,6 +123,36 @@ learning). Turn it off to get the plain linear range in angle mode as well.
   Restart the browser afterwards. If that does not help, use the `.deb` build of Google Chrome, or
   a Flatpak or `.deb` build of Firefox/Chromium.
 - You can check what the browser sees with the debug overlay (`) or the raw bars in the setup screen.
+
+## Deploying
+
+Run `npm run build`, then point the web server's document root at `public/`, like a Laravel app.
+`src/`, `node_modules/` and `.git/` stay outside the document root. Nothing else is needed: no
+rewrites, no Node on the server. `public/` is generated (and git-ignored); every build replaces it.
+
+Apache:
+
+```apache
+<VirtualHost *:80>
+    ServerName drone.local
+    DocumentRoot /var/www/browser-los-drone-simulator/public
+</VirtualHost>
+```
+
+nginx:
+
+```nginx
+server {
+    server_name drone.example.com;
+    root /var/www/browser-los-drone-simulator/public;
+    index index.html;
+    location /assets/ { expires 1y; } # file names are content-hashed
+}
+```
+
+**Serve it over HTTPS.** The Gamepad API is specified for secure contexts only, so a browser may
+refuse controllers on a plain `http://` domain (`localhost` counts as secure). The keyboard works
+either way.
 
 ## Settings
 
