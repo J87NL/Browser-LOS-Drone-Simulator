@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   applyDeadzone, normalizeStick, normalizeThrottle, modePreset, mapGamepad, defaultMapping,
-  AxisDetector, calibrationFromDetection, detectBinding, bindingActive, sanitizeMapping, heldAtEnd, assignDetectedAxis,
+  AxisDetector, calibrationFromDetection, detectBinding, bindingActive, sanitizeMapping, heldAtEnd, assignDetectedAxis, stickLocation,
 } from '../src/input/mapping.js';
 import { actionEvents, InputManager, shouldFailsafe } from '../src/input/input.js';
 import { GamepadManager } from '../src/input/gamepad.js';
@@ -59,6 +59,15 @@ describe('mode presets', () => {
       const idx = Object.values(m).map((a) => a.index).sort();
       expect(idx).toEqual([0, 1, 2, 3]);
     }
+  });
+
+  it('names the physical stick for each function and mode', () => {
+    expect(stickLocation('yaw', 2)).toEqual({ stick: 'left', direction: 'left–right' });
+    expect(stickLocation('throttle', 2)).toEqual({ stick: 'left', direction: 'up–down' });
+    expect(stickLocation('pitch', 1)).toEqual({ stick: 'left', direction: 'up–down' });
+    expect(stickLocation('throttle', 1)).toEqual({ stick: 'right', direction: 'up–down' });
+    expect(stickLocation('yaw', 4)).toEqual({ stick: 'right', direction: 'left–right' });
+    expect(stickLocation('roll', 3)).toEqual({ stick: 'left', direction: 'left–right' });
   });
 
   it('mode 1 swaps throttle and pitch compared to mode 2', () => {

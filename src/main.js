@@ -17,6 +17,7 @@ import { CameraRig, CAMERA_LABELS } from './cameras.js';
 import { GamepadManager } from './input/gamepad.js';
 import { Keyboard } from './input/keyboard.js';
 import { InputManager, shouldFailsafe } from './input/input.js';
+import { ArmGesture } from './input/gesture.js';
 import { MotorSound } from './audio.js';
 import { Hud } from './ui/hud.js';
 import { Toasts } from './ui/toast.js';
@@ -70,6 +71,7 @@ const gamepads = new GamepadManager();
 const keyboard = new Keyboard(window);
 const input = new InputManager(gamepads, keyboard);
 const sound = new MotorSound();
+const armGesture = new ArmGesture();
 const hud = new Hud(ui);
 const toasts = new Toasts(ui);
 const marker = new LosMarker(ui);
@@ -119,7 +121,6 @@ function applySettings(key) {
   const all = key === 'all' || key === 'init';
   if (all || key === 'preset') {
     quad.setParams(preset());
-    drone.root.scale.setScalar(preset().modelScale);
     resetDrone();
   }
   if (all || key === 'lowQuality') {
@@ -207,6 +208,7 @@ camera.aspect = innerWidth / innerHeight;
 // --- Loop ------------------------------------------------------------------------------
 const renderPos = new THREE.Vector3();
 const renderQuat = new THREE.Quaternion();
+const _droneUp = new THREE.Vector3();
 const cmd = { thrust: 0, roll: 0, pitch: 0, yaw: 0, mode: 'angle', rates: settings.rates, angleMaxTilt: settings.angleMaxTilt };
 let last = performance.now();
 let lastRender = 0;
@@ -224,6 +226,13 @@ function frame(now) {
   input.enabled = !paused;
   const { state, events, pad } = input.update(dt);
   for (const ev of events) handleEvent(ev, state);
+  if (settings.stickArm && !paused) {
+    const g = armGesture.update(dt, state, { armed: quad.armed, grounded: quad.grounded });
+    if (g) {
+      handleEvent(g, state);
+      if (quad.armed === (g === 'arm')) toasts.show(g === 'arm' ? 'Armed (stick command)' : 'Disarmed (stick command)', 1500);
+    }
+  }
   calibration.update();
 
   cmd.mode = flightMode;
@@ -247,10 +256,16 @@ function frame(now) {
   quad.renderPose(alpha, renderPos, renderQuat);
 
   // Visuals
-  drone.root.position.copy(renderPos);
+  // Visual size setting: scale the model and lift it along its own up axis
+  // so its feet still sit on the collision sphere's bottom (no sinking in).
+  const scale = preset().modelScale * settings.droneSize;
+  drone.root.scale.setScalar(scale);
   drone.root.quaternion.copy(renderQuat);
-  const scale = preset().modelScale;
-  rig.update(dt, renderPos, renderQuat, quad.heading, settings, scale);
+  drone.root.position.copy(renderPos).addScaledVector(
+    _droneUp.set(0, 1, 0).applyQuaternion(renderQuat),
+    preset().radius * (settings.droneSize - 1),
+  );
+  rig.update(dt, renderPos, renderQuat, quad.heading, settings, scale, preset().modelScale, drone.root.position);
   const camDist = camera.position.distanceTo(renderPos);
   drone.update(quad.motor, paused ? 0 : dt, camDist, rig.mode === 'fpv');
   lights.follow(renderPos);

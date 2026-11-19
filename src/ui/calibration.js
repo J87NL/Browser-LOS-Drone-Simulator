@@ -3,16 +3,11 @@
 // assignment, and live raw/mapped bars. Changes are saved immediately.
 import { h } from './dom.js';
 import {
-  STICKS, ACTIONS, ACTION_LABELS, AxisDetector, detectBinding,
+  STICKS, ACTIONS, ACTION_LABELS, ACTION_KEYS, AxisDetector, detectBinding,
   describeBinding, defaultMapping, modePreset, mapGamepad, snapshot, heldAtEnd, assignDetectedAxis,
 } from '../input/mapping.js';
+import { stickGuide } from './stick-guide.js';
 
-const STICK_PROMPT = {
-  throttle: 'Move the THROTTLE stick fully up and down a few times, then hold it at FULL UP',
-  yaw: 'Move the YAW stick fully left and right a few times, then hold it at FULL RIGHT',
-  pitch: 'Move the PITCH stick fully forward and back a few times, then hold it FORWARD (away from you)',
-  roll: 'Move the ROLL stick fully left and right a few times, then hold it at FULL RIGHT',
-};
 
 export class CalibrationScreen {
   /**
@@ -245,9 +240,13 @@ export class CalibrationScreen {
     let banner = null;
     if (this.wizard) {
       const step = this.wizard.steps[this.wizard.i];
-      const text = step === 'center' ? 'Let the yaw, pitch and roll sticks rest at center (throttle anywhere)' : STICK_PROMPT[step];
+      const title = step === 'center' ? 'center the sticks' : `the ${step.toUpperCase()} stick`;
       banner = h('div', { class: 'banner' },
-        h('div', {}, h('b', { text: `Step ${this.wizard.i + 1}/${this.wizard.steps.length}: ` }), text, ', then press Next (Enter).'),
+        h('div', {}, h('b', { text: `Step ${this.wizard.i + 1}/${this.wizard.steps.length}: ${title}` })),
+        step === 'center'
+          ? h('p', { text: 'Let go of the yaw, pitch and roll sticks so they rest at center (throttle can stay anywhere).' })
+          : stickGuide(step, this.mapping.stickMode ?? 2),
+        h('div', { class: 'muted', text: 'Not sure which stick it is? Watch the raw input bars at the bottom of this screen: the bar that moves is the axis that will be used. Press Next (or Enter) when done.' }),
         this.wizard.message && h('div', { class: 'warn', text: this.wizard.message }),
         h('div', { class: 'row' },
           h('button', { text: 'Next', onclick: () => this._wizardNext() }),
@@ -339,6 +338,7 @@ export class CalibrationScreen {
       return h('tr', {},
         h('th', { text: ACTION_LABELS[a] }),
         h('td', { text: describeBinding(this.mapping.buttons[a]) }),
+        h('td', { class: 'muted', text: `or key ${ACTION_KEYS[a]}` }),
         h('td', {}, ind),
         h('td', {},
           h('button', { class: 'tiny', text: 'assign', onclick: () => this._listen(a) }),
@@ -393,7 +393,7 @@ export class CalibrationScreen {
           h('thead', {}, h('tr', {}, ...['', 'axis', 'invert', 'min', 'center', 'max', 'raw', 'mapped', ''].map((t) => h('th', { text: t })))),
           h('tbody', {}, stickRows)),
         h('h3', { text: 'Buttons and switches' }),
-        h('p', { class: 'muted', text: 'A switch on an axis counts as pressed past 0.5. Arm and flight mode on a switch follow its position.' }),
+        h('p', { class: 'muted', text: 'Optional: the keyboard keys always work, also with a controller connected. A switch on an axis counts as pressed past 0.5. Arm and flight mode on a switch follow its position.' }),
         h('table', { class: 'cal' }, h('tbody', {}, buttonRows)),
         h('h3', { text: 'Raw input' }),
         h('div', { class: 'raw-grid' }, rawAxes),

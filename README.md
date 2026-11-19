@@ -52,6 +52,10 @@ optional peer dependencies.
 
 - With a controller connected you can still use W/S: the throttle that moved last wins. A clear move
   of the controller throttle (not stick jitter) takes it back, continuing from its position.
+- **Stick command arming (DJI style):** hold both sticks in the bottom corners for 1.5 s, both
+  outward or both inward (throttle down, pitch back, yaw and roll to opposite sides). The same gesture
+  disarms, but only while the quad is on the ground. It works in every stick mode and can be turned
+  off in Settings; the hold time is `INPUT.stickArmHold` in `src/config.js`.
 - **Arming** needs the throttle low (below 5%). A self-centring gamepad throttle rests at 50%,
   so hold the stick down while you press arm.
 - You start in **angle mode** (self-levelling, max tilt 55° on the 5" preset). With "throttle stick
@@ -69,7 +73,13 @@ optional peer dependencies.
   quad is far away a ring with its distance is drawn around it; if it gets off screen an arrow points
   to it. Press P (or the mapped button) to walk over: you then stand 5 m behind the quad, looking at its tail.
 - **Chase**: behind and above, follows yaw with some lag but not roll or pitch.
-- **FPV**: on the quad, uptilt 25° and 110° horizontal FOV by default (both in Settings).
+- **FPV**: on the quad, uptilt 25° and 110° horizontal FOV by default (both in Settings). The option
+  "FPV: front props in view" mounts the camera further back, so the inner part of the front props
+  shows in the lower corners, as on many real builds.
+
+The drone is drawn 1.5× its real size by default so it is easier to see in LOS. Settings → "Drone
+size" changes this between 1× and 3×. It only changes the drawing: physics and collisions keep
+the real size.
 
 ## Controller setup and calibration
 
@@ -81,14 +91,16 @@ device id) in `localStorage`, so they survive a reload.
 2. Standard gamepads: choose your **stick mode preset** (1–4) and click apply. That is usually all.
 3. RC transmitters and other joysticks: click **Guided stick setup**. For each stick it asks you to
    move it through its full range a few times, then hold it at one end (throttle up, yaw right, pitch
-   forward, roll right) and press **Next** (or Enter). The axis that moved most is taken, its min/max
+   forward, roll right) and press **Next** (or Enter). An animation shows the stick movement and what
+   the drone does with it, and names the physical stick for the selected mode. The axis that moved most is taken, its min/max
    are recorded and invert is set from where you held it. The last step records the stick centres.
    The "detect" button on a single row does the same for one stick. If the axis it finds belonged to
    another stick, the two swap: that other stick gets a neutral calibration and you are asked to
    detect it next. A self-centring stick must be moved both ways before Next is accepted.
 4. Fine-tune per axis: axis number, invert, min/center/max (type a value or press "set" to take
    the current stick position), and the deadzone (default 0.03).
-5. **Buttons and switches**: click assign next to an action, then press a button or flip a switch.
+5. **Buttons and switches** (optional: the keyboard keys Space, C, M, R and P always work, also with a
+   controller connected): click assign next to an action, then press a button or flip a switch.
    Radios often only expose switches as axes; an axis switch counts as on past 0.5 in the direction
    you flipped it. Arm and flight mode on a switch follow the switch position (like on a real quad:
    flip to arm, flip back to disarm), and the sim does not arm if the switch is already on when

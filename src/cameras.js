@@ -67,9 +67,13 @@ export class CameraRig {
    * @param {THREE.Quaternion} quat drone render orientation
    * @param {number} heading drone heading (rad)
    * @param {object} settings
-   * @param {number} scale model scale (whoop is smaller)
+   * @param {number} scale drawn model scale (chase distance, FPV camera offset)
+   * @param {number} zoomScale physical size scale for LOS auto-zoom; the
+   *   visual size setting is left out so a bigger drone really looks bigger
+   * @param {THREE.Vector3|null} modelPos where the model is drawn (it is lifted
+   *   when drawn larger); the FPV camera is mounted relative to it
    */
-  update(dt, pos, quat, heading, settings, scale = 1) {
+  update(dt, pos, quat, heading, settings, scale = 1, zoomScale = scale, modelPos = null) {
     const cam = this.camera;
     let fov;
     let near = 0.1;
@@ -79,7 +83,7 @@ export class CameraRig {
       cam.position.copy(this.pilot);
       cam.up.set(0, 1, 0);
       cam.lookAt(this.lookTarget);
-      const dist = this.pilot.distanceTo(pos) / scale;
+      const dist = this.pilot.distanceTo(pos) / zoomScale;
       const target = settings.losAutoZoom ? losFov(dist) : CAMERA.losFixedFov;
       fov = this.snap ? target : this.fov + (target - this.fov) * damp(CAMERA.losZoomSmoothing, dt);
     } else if (this.mode === 'chase') {
@@ -99,12 +103,15 @@ export class CameraRig {
       cam.lookAt(_v);
       fov = CAMERA.chaseFov;
     } else {
-      _v.set(0, 0.02, -0.05).multiplyScalar(scale).applyQuaternion(quat);
-      cam.position.copy(pos).add(_v);
+      // Camera mount in model coordinates (scaled with the drawn model). With
+      // "props in view" it sits further back between the front arms.
+      const mount = settings.fpvPropsInView ? CAMERA.fpvMountPropsInView : CAMERA.fpvMount;
+      _v.fromArray(mount).multiplyScalar(scale).applyQuaternion(quat);
+      cam.position.copy(modelPos ?? pos).add(_v);
       _q.setFromAxisAngle(X, THREE.MathUtils.degToRad(settings.fpvUptilt));
       cam.quaternion.copy(quat).multiply(_q);
       fov = horizontalToVerticalFov(settings.fpvFov, cam.aspect);
-      near = 0.02;
+      near = 0.01;
     }
     this.fov = fov;
     if (cam.fov !== fov || cam.near !== near) {

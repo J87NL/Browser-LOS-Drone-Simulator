@@ -121,3 +121,71 @@ thead th { color: var(--muted); font-size: 12px; text-transform: none; }
   .hud { min-width: 0; right: 12px; }
   .help { display: none; }
 }
+
+/* Guided setup: animated stick + drone explanation */
+.guide { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; margin: 8px 0; }
+.guide-text { flex: 1; min-width: 240px; }
+.guide-text p { margin: 4px 0; }
+.stick-guide { width: 300px; max-width: 100%; height: auto; flex: none; }
+.guide-box { fill: rgba(255, 255, 255, 0.06); stroke: rgba(255, 255, 255, 0.35); stroke-width: 1.5; }
+.guide-cross { stroke: rgba(255, 255, 255, 0.25); stroke-width: 1; stroke-dasharray: 3 3; }
+.guide-knob { fill: var(--accent); stroke: #fff; stroke-width: 2; }
+.guide-ground { stroke: rgba(255, 255, 255, 0.3); stroke-width: 1.5; }
+.guide-label { fill: var(--muted); font: 11px var(--font); text-anchor: middle; }
+.guide-knob, .guide-drone { transform-box: fill-box; transform-origin: center; animation: 4.5s ease-in-out infinite; }
+
+/* Each animation: both ends twice, then hold at the end the step asks for. */
+.guide-throttle .guide-knob, .guide-pitch .guide-knob { animation-name: knob-vertical; }
+.guide-yaw .guide-knob, .guide-roll .guide-knob { animation-name: knob-horizontal; }
+.guide-throttle .guide-drone { animation-name: drone-throttle; }
+.guide-yaw .guide-drone { animation-name: drone-yaw; }
+.guide-pitch .guide-drone { animation-name: drone-pitch; }
+.guide-roll .guide-drone { animation-name: drone-roll; }
+
+@keyframes knob-vertical {
+  0%, 4% { transform: translate(0, 0); }
+  16% { transform: translate(0, 38px); }
+  30% { transform: translate(0, -38px); }
+  44% { transform: translate(0, 38px); }
+  58%, 100% { transform: translate(0, -38px); }
+}
+@keyframes knob-horizontal {
+  0%, 4% { transform: translate(0, 0); }
+  16% { transform: translate(-38px, 0); }
+  30% { transform: translate(38px, 0); }
+  44% { transform: translate(-38px, 0); }
+  58%, 100% { transform: translate(38px, 0); }
+}
+@keyframes drone-throttle {
+  0%, 4% { transform: translate(0, 0); }
+  16% { transform: translate(0, 30px); }
+  30% { transform: translate(0, -30px); }
+  44% { transform: translate(0, 30px); }
+  58%, 100% { transform: translate(0, -30px); }
+}
+@keyframes drone-yaw {
+  0%, 4% { transform: rotate(0deg); }
+  16% { transform: rotate(-50deg); }
+  30% { transform: rotate(50deg); }
+  44% { transform: rotate(-50deg); }
+  58%, 100% { transform: rotate(50deg); }
+}
+@keyframes drone-pitch {
+  0%, 4% { transform: translate(0, 0) rotate(0deg); }
+  16% { transform: translate(-18px, 0) rotate(-22deg); }
+  30% { transform: translate(18px, 0) rotate(22deg); }
+  44% { transform: translate(-18px, 0) rotate(-22deg); }
+  58%, 100% { transform: translate(18px, 0) rotate(22deg); }
+}
+@keyframes drone-roll {
+  0%, 4% { transform: translate(0, 0) rotate(0deg); }
+  16% { transform: translate(-18px, 0) rotate(-22deg); }
+  30% { transform: translate(18px, 0) rotate(22deg); }
+  44% { transform: translate(-18px, 0) rotate(-22deg); }
+  58%, 100% { transform: translate(18px, 0) rotate(22deg); }
+}
+
+/* Reduced motion: show the pose to hold, without animating. */
+@media (prefers-reduced-motion: reduce) {
+  .guide-knob, .guide-drone { animation-delay: -4.4s; animation-play-state: paused; }
+}

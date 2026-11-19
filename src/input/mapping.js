@@ -4,6 +4,8 @@ import { INPUT } from '../config.js';
 
 export const STICKS = ['throttle', 'yaw', 'pitch', 'roll'];
 export const ACTIONS = ['arm', 'camera', 'flightMode', 'reset', 'pilot'];
+/** Keyboard keys that always trigger the same actions (see keyboard.js). */
+export const ACTION_KEYS = { arm: 'Space', camera: 'C', flightMode: 'M', reset: 'R', pilot: 'P' };
 export const ACTION_LABELS = {
   arm: 'Arm / disarm',
   camera: 'Camera mode',
@@ -85,6 +87,15 @@ export function modePreset(mode) {
   const axes = {};
   for (const s of STICKS) axes[s] = stickCal(l[s], vertical(l[s]));
   return axes;
+}
+
+/**
+ * Which physical stick and direction a function is on for a stick mode,
+ * e.g. yaw in mode 2 -> { stick: 'left', direction: 'left–right' }.
+ */
+export function stickLocation(stick, mode) {
+  const index = modePreset(mode)[stick].index; // 0/1 left X/Y, 2/3 right X/Y
+  return { stick: index < 2 ? 'left' : 'right', direction: index % 2 === 0 ? 'left–right' : 'up–down' };
 }
 
 /** A fresh mapping. Standard gamepads get sensible buttons too. */

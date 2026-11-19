@@ -123,12 +123,17 @@ export const CAMERA = {
   chaseYawLag: 4, // 1/s
   chasePosLag: 8, // 1/s
   fpvUptilt: 25,
+  fpvMount: [0, 0.02, -0.05], // model coords: above the front of the frame
+  fpvMountPropsInView: [0, -0.005, -0.02], // further back: front props show in the lower corners
   fpvFov: 110, // horizontal degrees
 };
 
 export const INPUT = {
   deadzone: 0.03,
   switchThreshold: 0.5,
+  stickArmHold: 1.5, // s, hold both sticks in the bottom corners to arm (DJI style)
+  stickArmThreshold: 0.85, // how far into the corner yaw/pitch/roll must be
+  stickArmThrottle: 0.05, // throttle must be below this
   padTakeover: 0.08, // pad throttle must move this far to take over from the keyboard
   keyboardRamp: 5, // stick units per second for keyboard sticks
   keyboardThrottleRate: 0.6, // throttle units per second while W/S held
@@ -150,11 +155,14 @@ export const DEFAULT_SETTINGS = {
   rates: structuredClone(DEFAULT_RATES),
   throttleExpo: 0.0,
   hoverAtCenter: true, // angle mode: throttle stick center = hover
+  stickArm: true, // arm/disarm by holding both sticks in the bottom corners
   angleMaxTilt: PRESETS[DEFAULT_PRESET].angleMaxTilt,
   fpvUptilt: CAMERA.fpvUptilt,
   fpvFov: CAMERA.fpvFov,
+  fpvPropsInView: false,
   losAutoZoom: true,
   losMarker: true,
+  droneSize: 1.5, // visual size multiplier (physics and collisions are unchanged)
   lowQuality: false,
   volume: 0, // muted by default
   showDebug: false,
@@ -167,6 +175,7 @@ export const SETTING_RANGES = {
   fpvUptilt: [-10, 60],
   fpvFov: [60, 150],
   volume: [0, 1],
+  droneSize: [1, 3],
   rate: [0, 2000], // deg/s, center and max
   rateExpo: [0, 1],
 };

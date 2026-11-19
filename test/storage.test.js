@@ -24,6 +24,7 @@ describe('settings storage', () => {
     expect(s.fpvFov).toBe(60);
     expect(s.angleMaxTilt).toBe(80);
     expect(s.volume).toBe(1);
+    expect(mergeSettings({ droneSize: 10 }).droneSize).toBe(3);
     expect(s.rates.yaw.center).toBe(0);
     expect(s.rates.yaw.expo).toBe(1);
   });
