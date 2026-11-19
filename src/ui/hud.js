@@ -20,6 +20,10 @@ export class Hud {
       h('div', { class: 'hud-row' },
         h('span', { class: 'hud-label', text: 'SPD' }), this.speed,
         h('span', { class: 'hud-label', text: 'ALT' }), this.alt),
+      (this.windRow = h('div', { class: 'hud-row hidden' },
+        h('span', { class: 'hud-label', text: 'WIND' }),
+        (this.windArrow = h('span', { class: 'wind-arrow', text: '↑', 'aria-hidden': 'true' })),
+        (this.windText = h('span', { class: 'hud-num' })))),
       this.source,
     );
     this.crash = h('div', { class: 'crash panel hidden' });
@@ -39,7 +43,7 @@ export class Hud {
     if (cls !== undefined) el.dataset.state = cls;
   }
 
-  update({ armed, mode, camera, throttle, speed, altitude, crashed, source, paused, armProgress = 0, sticksLocked = false }) {
+  update({ armed, mode, camera, throttle, speed, altitude, crashed, source, paused, armProgress = 0, sticksLocked = false, wind = null }) {
     // While a stick-command hold is in progress, show how far along it is.
     const holding = armProgress > 0 ? ` ${'▮'.repeat(Math.ceil(armProgress * 5)).padEnd(5, '▯')}` : '';
     let label = armProgress > 0 ? (armed ? 'DISARMING' : 'ARMING') + holding : armed ? 'ARMED' : 'DISARMED';
@@ -51,6 +55,14 @@ export class Hud {
     this._set(this.thrText, 'thr', `${Math.round(throttle * 100)}%`);
     this._set(this.speed, 'spd', `${(speed * 3.6).toFixed(0)} km/h`);
     this._set(this.alt, 'alt', `${altitude.toFixed(1)} m`);
+    // Wind: speed and an arrow for where it blows to, as seen from the pilot (looking ahead = up).
+    const ws = wind ? Math.hypot(wind.x, wind.z) : 0;
+    if (ws > 0.05) {
+      const deg = Math.round((Math.atan2(wind.x, -wind.z) * 180) / Math.PI);
+      this.windArrow.style.transform = `rotate(${deg}deg)`;
+      this._set(this.windText, 'wind', `${ws.toFixed(1)} m/s`);
+    }
+    this.windRow.classList.toggle('hidden', !(ws > 0.05));
     this._set(this.source, 'src', source);
     const crashText = crashed ? `Crashed at ${crashed.speed.toFixed(1)} m/s. Press reset (R) to go back to the pad.` : '';
     this._set(this.crash, 'crash', crashText);

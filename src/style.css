@@ -189,3 +189,5 @@ thead th { color: var(--muted); font-size: 12px; text-transform: none; }
 @media (prefers-reduced-motion: reduce) {
   .guide-knob, .guide-drone { animation-delay: -4.4s; animation-play-state: paused; }
 }
+
+.wind-arrow { display: inline-block; font: 700 15px/1 var(--font); color: #9fd8ff; transition: transform 0.3s; }

@@ -185,7 +185,11 @@ export const DEFAULT_SETTINGS = {
   losAutoZoom: true,
   losMarker: true,
   droneSize: 1.5, // drawn size; collisions follow it, flight physics do not
+  windSpeed: 0, // m/s, 0 = calm
+  windFrom: 90, // degrees clockwise from straight ahead of the pilot: 90 = crosswind from the right
+  windGusts: 0.4, // 0 = steady, 1 = very gusty
   lowQuality: false,
+  photoMode: false, // real sky + ground photo (if installed), ambient occlusion, sharper shadows
   volume: 0, // muted by default
   showDebug: false,
 };
@@ -198,6 +202,9 @@ export const SETTING_RANGES = {
   fpvFov: [60, 150],
   volume: [0, 1],
   droneSize: [1, 3],
+  windSpeed: [0, 15],
+  windFrom: [0, 359],
+  windGusts: [0, 1],
   rate: [0, 2000], // deg/s, center and max
   rateExpo: [0, 1],
 };

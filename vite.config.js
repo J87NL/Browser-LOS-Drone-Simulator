@@ -5,9 +5,9 @@ export default defineConfig({
   base: './',
   // Build into public/ so a web server's document root can point there
   // (Laravel style) and src/, node_modules/ and .git/ stay outside it.
-  // Vite's own "copy public/ as-is" feature is switched off: the project has
-  // no static files, and the build output must not be fed back into itself.
-  publicDir: false,
+  // Static files (the optional photo-quality images) live in static/ and are
+  // copied into the build; public/ is only the build output.
+  publicDir: 'static',
   build: {
     outDir: 'public',
     emptyOutDir: true,

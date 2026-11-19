@@ -152,8 +152,7 @@ Point the web server's document root at `public/`, like a Laravel app: `src/`, `
   build on a live server instead, build into another folder (`npx vite build --outDir /tmp/drone-build`)
   and swap it in, because each build first empties `public/`.
 - `public/` is generated and git-ignored. Do not put files there by hand (a favicon, `robots.txt`):
-  the next build deletes them. If static files are ever needed, put them in a `static/` folder and
-  set `publicDir: 'static'` in `vite.config.js`.
+  the next build deletes them. Static files go in `static/`; the build copies them into `public/`.
 
 **Serve it over HTTPS.** The Gamepad API is specified for secure contexts only, so a browser may
 refuse controllers on a plain `http://` domain. `localhost` and `*.localhost` count as secure. The
@@ -200,7 +199,14 @@ Esc opens the settings panel (the sim pauses while it is open):
 - Stick command arming on/off.
 - FPV uptilt and FOV, FPV front props in view, LOS auto-zoom on/off, LOS marker on/off.
 - Drone size (drawn size and collisions, 1× to 3×, default 1.5×; flight physics unchanged).
+- Wind: speed (0 = calm, up to 15 m/s), direction it comes from (0 = in your face, 90 = from the right,
+  270 = from the left) and gusts. The HUD shows the wind with an arrow, flags fly downwind and trees
+  sway harder. Drag works on the speed relative to the air, so the quad drifts and you have to hold it
+  into the wind; on the ground it stays put.
 - Low quality (no shadows, pixel ratio 1, about a third of the trees). Use this on weak iGPUs.
+- Photo quality: ambient occlusion and sharper, wider sun shadows, plus a real sky (HDRI) and a
+  photo-scanned ground texture when those images are installed in `static/photo/` (see the README
+  there; Poly Haven and ambientCG have suitable CC0 files). Heavier than the default.
 - Motor sound volume (off by default).
 
 Everything is saved in `localStorage`. "Reset all settings" restores the defaults (controller

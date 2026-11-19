@@ -19,7 +19,7 @@ export function createLights(scene, sunDir) {
   scene.add(sun, sun.target);
 
   const focus = new THREE.Vector3();
-  const texel = 56 / 2048;
+  let texel = 56 / 2048;
   return {
     sun,
     hemi,
@@ -31,6 +31,19 @@ export function createLights(scene, sunDir) {
     },
     setShadows(on) {
       sun.castShadow = on;
+    },
+    /** Photo quality: a bigger, sharper shadow map over a wider area. */
+    setHighQuality(on) {
+      const size = on ? 4096 : 2048;
+      const half = on ? 40 : 28;
+      if (sun.shadow.mapSize.x === size) return;
+      sun.shadow.mapSize.set(size, size);
+      s.left = s.bottom = -half;
+      s.right = s.top = half;
+      s.updateProjectionMatrix();
+      texel = (half * 2) / size;
+      sun.shadow.map?.dispose(); // reallocated at the new size on the next render
+      sun.shadow.map = null;
     },
   };
 }

@@ -111,6 +111,8 @@ export function createTrees(scene, collision, keepOutZones) {
 
   // Shared wind: canopies sway a little, more at the top.
   const wind = { value: 0 };
+  const windStrength = { value: 1 };
+  let lastTime = 0;
   const canopies = VARIANTS.map((v) => {
     const count = trees.filter((t) => t.variant === VARIANTS.indexOf(v)).length;
     const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.9, flatShading: true, side: THREE.DoubleSide });
@@ -119,8 +121,9 @@ export function createTrees(scene, collision, keepOutZones) {
     mat.shadowSide = THREE.FrontSide;
     mat.onBeforeCompile = (shader) => {
       shader.uniforms.uWind = wind;
+      shader.uniforms.uWindStrength = windStrength;
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nuniform float uWind;')
+        .replace('#include <common>', '#include <common>\nuniform float uWind;\nuniform float uWindStrength;')
         .replace('#include <begin_vertex>', `#include <begin_vertex>
           #ifdef USE_INSTANCING
             vec2 tp = instanceMatrix[3].xz;
@@ -128,7 +131,7 @@ export function createTrees(scene, collision, keepOutZones) {
             vec2 tp = vec2(0.0);
           #endif
           float sway = sin(uWind * 1.1 + tp.x * 0.13 + tp.y * 0.07) + 0.4 * sin(uWind * 2.3 + tp.x * 0.5);
-          float hgt = max(transformed.y - 1.5, 0.0);
+          float hgt = max(transformed.y - 1.5, 0.0) * uWindStrength;
           transformed.x += sway * 0.025 * hgt;
           transformed.z += sway * 0.012 * hgt;`);
     };
@@ -206,8 +209,11 @@ export function createTrees(scene, collision, keepOutZones) {
   scene.add(trunks, ...canopies, blobs);
 
   return {
-    update(time) {
-      wind.value = time;
+    update(time, windSpeed = 0) {
+      // Sway phase advances faster and further in stronger wind.
+      wind.value += (time - lastTime) * (1 + windSpeed * 0.25);
+      lastTime = time;
+      windStrength.value = 1 + windSpeed * 0.35;
     },
     count: trees.length,
     setCount(n) {

@@ -13,6 +13,7 @@ const UP = new Vector3(0, 1, 0);
 const _up = new Vector3();
 const _force = new Vector3();
 const _vH = new Vector3();
+const _vRel = new Vector3();
 const _axis = new Vector3();
 const _dq = new Quaternion();
 const _qInv = new Quaternion();
@@ -46,6 +47,7 @@ export class Quad {
     this.crashed = null; // { speed } when crashed
     this.grounded = false;
     this.lastImpact = 0;
+    this.wind = new Vector3(); // m/s, world frame; set by the caller
     this.drawScale = 1;
     this.setDrawScale(1);
   }
@@ -160,8 +162,12 @@ export class Quad {
 
     // Drag split into the body-vertical axis and the body plane, so the quad
     // carves (low drag sideways through the disc, high drag through it).
-    const vUp = this.vel.dot(up);
-    _vH.copy(this.vel).addScaledVector(up, -vUp);
+    // Drag works on the velocity relative to the air. A quad resting on the
+    // ground is held by its feet, so wind does not slide it around.
+    _vRel.copy(this.vel);
+    if (!this.grounded) _vRel.sub(this.wind);
+    const vUp = _vRel.dot(up);
+    _vH.copy(_vRel).addScaledVector(up, -vUp);
     const vHLen = _vH.length();
     _force.addScaledVector(up, -(p.dragLinV * vUp + p.dragQuadV * Math.abs(vUp) * vUp));
     _force.addScaledVector(_vH, -(p.dragLinH + p.dragQuadH * vHLen));

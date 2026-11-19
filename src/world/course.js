@@ -191,8 +191,18 @@ export function createCourse(scene, collision) {
       { x: -26, z: -30, r: 12 },
       { x: 30, z: -15, r: 6 },
     ],
-    update(t) {
-      for (const f of flags) f.rotation.z = Math.sin(t * 1.3 + f.userData.phase) * 0.04;
+    /** Flags turn to fly downwind and flutter more in stronger wind. */
+    update(t, wind = null) {
+      const ws = wind ? Math.hypot(wind.x, wind.z) : 0;
+      for (const f of flags) {
+        if (ws > 0.3) {
+          const target = Math.atan2(-wind.z, wind.x); // banner extends along local +X
+          let d = target - f.rotation.y;
+          d = Math.atan2(Math.sin(d), Math.cos(d));
+          f.rotation.y += d * 0.05;
+        }
+        f.rotation.z = Math.sin(t * (1.3 + ws * 0.5) + f.userData.phase) * (0.04 + ws * 0.01);
+      }
     },
   };
 }

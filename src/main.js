@@ -6,10 +6,12 @@ import { FixedStepper } from './physics/stepper.js';
 import { Quad } from './physics/quad.js';
 import { CollisionWorld } from './physics/colliders.js';
 import { shapeThrottle } from './physics/controls.js';
+import { windAt } from './physics/wind.js';
 import { terrainHeight } from './world/terrain-height.js';
 import { createTerrain } from './world/terrain.js';
 import { createDistantLand } from './world/distant.js';
 import { createSky } from './world/sky.js';
+import { createPhotoMode } from './photo.js';
 import { createLights } from './world/lights.js';
 import { createTrees } from './world/trees.js';
 import { createCourse, PAD } from './world/course.js';
@@ -46,9 +48,11 @@ document.getElementById('app').append(renderer.domElement);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 6000);
 
-const { sunDir } = createSky(renderer, scene);
+const { sky, sunDir } = createSky(renderer, scene);
 const lights = createLights(scene, sunDir);
-scene.add(createTerrain(renderer));
+const terrain = createTerrain(renderer);
+scene.add(terrain);
+const photo = createPhotoMode({ renderer, scene, camera, sky, sunDir, lights, terrain });
 createDistantLand(scene);
 
 const collision = new CollisionWorld(terrainHeight);
@@ -126,8 +130,18 @@ function applySettings(key) {
     quad.setParams(preset());
     resetDrone();
   }
-  if (all || key === 'lowQuality') {
+  if (all || key === 'lowQuality' || key === 'photoMode') {
     const low = settings.lowQuality;
+    const wantPhoto = settings.photoMode && !low;
+    if (wantPhoto !== photo.enabled) {
+      photo.setEnabled(wantPhoto).then((found) => {
+        if (!wantPhoto || key === 'init') return;
+        const missing = [!found.sky && 'sky', !found.ground && 'ground texture'].filter(Boolean);
+        toasts.show(missing.length
+          ? `Photo quality on (ambient occlusion, sharper shadows). Photo ${missing.join(' and ')} not installed: see static/photo/README.md`
+          : 'Photo quality on', 4000);
+      });
+    }
     lights.setShadows(!low);
     trees.setShadows(!low);
     trees.setCount(low ? WORLD.treeCountLow : WORLD.treeCountHigh);
@@ -207,6 +221,7 @@ function resize() {
   camera.updateProjectionMatrix();
   renderer.setPixelRatio(pr);
   renderer.setSize(innerWidth, innerHeight);
+  photo.setSize(innerWidth, innerHeight, pr);
 }
 window.addEventListener('resize', resize);
 
@@ -267,6 +282,8 @@ function frame(now) {
     thrustToWeight: preset().thrustToWeight,
   });
 
+  windAt(stepper.time, settings, quad.wind);
+
   let steps = 0;
   let alpha = 1;
   if (!paused) {
@@ -287,8 +304,8 @@ function frame(now) {
   const camDist = camera.position.distanceTo(renderPos);
   drone.update(quad.motor, paused ? 0 : dt, camDist, rig.mode === 'fpv');
   lights.follow(renderPos);
-  course.update(elapsed);
-  trees.update(elapsed);
+  course.update(elapsed, quad.wind);
+  trees.update(elapsed, quad.wind.length());
   sound.update(paused ? 0 : quad.motor, quad.armed && !paused, rig.mode === 'fpv' ? 1 : camDist);
 
   if (rig.mode === 'los' && settings.losMarker) {
@@ -308,10 +325,12 @@ function frame(now) {
     paused,
     armProgress: armGesture.progress,
     sticksLocked: armGesture.sticksLocked,
+    wind: quad.wind,
   });
   debug.update(dt, { steps, simTime: stepper.time, input: state, thrust: cmd.thrust, quad, pad });
 
-  renderer.render(scene, camera);
+  if (photo.enabled) photo.render();
+  else renderer.render(scene, camera);
 }
 requestAnimationFrame(frame);
 
