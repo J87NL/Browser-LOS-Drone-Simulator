@@ -204,9 +204,9 @@ Esc opens the settings panel (the sim pauses while it is open):
   sway harder. Drag works on the speed relative to the air, so the quad drifts and you have to hold it
   into the wind; on the ground it stays put.
 - Low quality (no shadows, pixel ratio 1, about a third of the trees). Use this on weak iGPUs.
-- Photo quality: ambient occlusion and sharper, wider sun shadows, plus a real sky (HDRI) and a
-  photo-scanned ground texture when those images are installed in `static/photo/` (see
-  [docs/photo-assets.md](docs/photo-assets.md); Poly Haven and ambientCG have suitable CC0 files).
+- Photo quality: a real sky (HDRI) that also lights the scene, a photo-scanned grass texture, ambient
+  occlusion and sharper, wider sun shadows. The images (CC0, from Poly Haven, about 10 MB) are in
+  `static/photo/` and only load when you switch this on; see [docs/photo-assets.md](docs/photo-assets.md).
   Heavier than the default, and off while Low quality is on.
 - Motor sound volume (off by default).
 

@@ -15,7 +15,7 @@ export const PHOTO_ASSETS = {
   groundColor: 'photo/ground_diff.jpg',
   groundNormal: 'photo/ground_nor.jpg',
   groundRough: 'photo/ground_rough.jpg',
-  groundTileMetres: 3, // how many metres one repeat of the ground texture covers
+  groundTileMetres: 2, // how many metres one repeat of the ground texture covers
 };
 
 // Light levels with a real sky. Starting values: tune them to the HDRI you install.
