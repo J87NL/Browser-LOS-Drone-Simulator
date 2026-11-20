@@ -111,7 +111,8 @@ device id) in `localStorage`, so they survive a reload.
    Radios often only expose switches as axes; an axis switch counts as on past 0.5 in the direction
    you flipped it. Arm and flight mode on a switch follow the switch position (like on a real quad:
    flip to arm, flip back to disarm), and the sim does not arm if the switch is already on when
-   the radio connects. Buttons toggle.
+   the radio connects. Disarming and flight mode changes on a switch also apply while a menu is open;
+   arming does not, flip the switch off and on again after closing it. Buttons toggle.
 6. Live bars show raw axes and buttons and the mapped stick values.
 
 ### Throttle that centres vs one that doesn't

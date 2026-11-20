@@ -2,6 +2,8 @@
 import { ACTIONS } from './mapping.js';
 import { INPUT } from '../config.js';
 
+const STATE_EVENTS_WHILE_PAUSED = new Set(['disarm', 'acro', 'angle']);
+
 /**
  * Failsafe: disarm only when the controller that is actually flying goes
  * away (matched by index and id), not when some other pad disconnects.
@@ -54,16 +56,17 @@ export class InputManager {
     const pad = this.gamepads.poll();
     const events = this.keyboard.takeEvents();
     const s = this.state;
+    let padEvents = [];
 
     if (pad) {
-      const key = pad.id;
+      const key = pad.key ?? pad.id;
       // First poll of a device (or after a mapping change): take the current
       // switch positions as the baseline so nothing fires on connect.
       if (this.prevActions === null || this.prevKey !== key) {
         this.prevActions = { ...pad.mapped.actions };
         this.prevKey = key;
       }
-      if (this.enabled) events.push(...actionEvents(this.prevActions, pad.mapped.actions, pad.mapping));
+      padEvents = actionEvents(this.prevActions, pad.mapped.actions, pad.mapping);
       this.prevActions = { ...pad.mapped.actions };
       s.source = 'gamepad';
       s.gamepadId = pad.id;
@@ -103,8 +106,8 @@ export class InputManager {
     }
     if (!this.enabled) {
       s.yaw = s.pitch = s.roll = 0;
-      return { state: s, events: [], pad };
+      return { state: s, events: padEvents.filter((e) => STATE_EVENTS_WHILE_PAUSED.has(e)), pad };
     }
-    return { state: s, events, pad };
+    return { state: s, events: [...events, ...padEvents], pad };
   }
 }

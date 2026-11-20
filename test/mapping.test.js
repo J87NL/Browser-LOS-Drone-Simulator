@@ -268,6 +268,57 @@ describe('InputManager', () => {
     v = 1;
     expect(im.update(0.016).events).toEqual(['arm']);
   });
+
+  const switchRadio = (getArm, getMode = () => -1, key = '0:radio') => {
+    const t = new EventTarget();
+    const mapping = {
+      ...defaultMapping(false),
+      buttons: { arm: { type: 'axis', index: 4, dir: 1 }, flightMode: { type: 'axis', index: 5, dir: 1 }, reset: { type: 'button', index: 1 } },
+    };
+    t.poll = () => {
+      const gp = pad([0, 1, 0, 1, getArm(), getMode()], t.pressed ?? []);
+      return { id: 'radio', key: typeof key === 'function' ? key() : key, gp, mapping, mapped: mapGamepad(gp, mapping) };
+    };
+    return t;
+  };
+
+  it('a disarm or mode switch flipped while paused still applies, an arm flip does not', () => {
+    let arm = 1;
+    let mode = -1;
+    const im = new InputManager(switchRadio(() => arm, () => mode), fakeKeyboard());
+    im.update(0.016);
+    im.enabled = false;
+    arm = -1;
+    mode = 1;
+    expect(im.update(0.016).events).toEqual(['disarm', 'acro']);
+    arm = 1;
+    expect(im.update(0.016).events).toEqual([]);
+    im.enabled = true;
+    expect(im.update(0.016).events).toEqual([]);
+  });
+
+  it('button presses while paused are dropped', () => {
+    const radio = switchRadio(() => -1);
+    const im = new InputManager(radio, fakeKeyboard());
+    im.update(0.016);
+    im.enabled = false;
+    radio.pressed = [1];
+    expect(im.update(0.016).events).toEqual([]);
+    radio.pressed = [];
+    im.update(0.016);
+    im.enabled = true;
+    expect(im.update(0.016).events).toEqual([]);
+  });
+
+  it('a second identical controller taking over does not fire its switch positions', () => {
+    let arm = -1;
+    let key = '0:radio';
+    const im = new InputManager(switchRadio(() => arm, () => -1, () => key), fakeKeyboard());
+    im.update(0.016);
+    key = '1:radio';
+    arm = 1;
+    expect(im.update(0.016).events).toEqual([]);
+  });
 });
 
 describe('GamepadManager storage', () => {
