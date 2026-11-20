@@ -5,6 +5,7 @@ export const RACE = {
   pointsPerSecondUnderPar: 20,
   crashPoints: -150,
   ghostInterval: 0.05,
+  ghostMaxSamples: 2400,
 };
 
 export const RACE_GATES = [
@@ -17,15 +18,10 @@ export const RACE_GATES = [
   { x: 48, z: -3, yaw: Math.PI / 2, width: 2.4, height: 1.8, bottom: 0.5 },
 ];
 
-/** Signed distance along the gate's pass direction axis: positive before the gate, negative after. */
 function sideOf(gate, x, z) {
   return (x - gate.x) * Math.sin(gate.yaw) + (z - gate.z) * Math.cos(gate.yaw);
 }
 
-/**
- * Whether the straight move from `from` to `to` flies through the opening of
- * `gate` in its pass direction. `ground` is the terrain height at the gate.
- */
 export function crossesGate(gate, from, to, ground = 0) {
   const before = sideOf(gate, from.x, from.z);
   const after = sideOf(gate, to.x, to.z);
@@ -44,10 +40,6 @@ export function lapBonus(lapSeconds) {
   return RACE.lapPoints + Math.round(underPar * RACE.pointsPerSecondUnderPar);
 }
 
-/**
- * Lap race through `gates` in order. Gate 0 is start and finish.
- * `update` returns the events of this move: start, gate, lap, crash.
- */
 export function createRace(gates = RACE_GATES, groundAt = () => 0) {
   const state = {
     running: false,
@@ -114,7 +106,6 @@ export function createRace(gates = RACE_GATES, groundAt = () => 0) {
   };
 }
 
-/** Samples [x, y, z, yaw] every RACE.ghostInterval seconds of a lap. */
 export function createGhostRecorder() {
   let samples = [];
   let since = 0;
@@ -125,7 +116,7 @@ export function createGhostRecorder() {
     },
     sample(dt, pos, heading) {
       since += dt;
-      if (since < RACE.ghostInterval) return;
+      if (since < RACE.ghostInterval || samples.length >= RACE.ghostMaxSamples * 4) return;
       since -= RACE.ghostInterval;
       samples.push(+pos.x.toFixed(2), +pos.y.toFixed(2), +pos.z.toFixed(2), +heading.toFixed(2));
     },
@@ -135,7 +126,6 @@ export function createGhostRecorder() {
   };
 }
 
-/** Ghost pose at `seconds` into the lap, interpolated between samples; null past the end. */
 export function ghostPose(samples, seconds) {
   const count = samples.length / 4;
   if (count < 2) return null;

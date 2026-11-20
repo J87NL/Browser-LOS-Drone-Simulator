@@ -53,7 +53,6 @@ export class Hud {
     if (cls !== undefined) el.dataset.state = cls;
   }
 
-  /** One line for the race or an exercise; empty hides it. */
   setChallenge(text) {
     this._set(this.challenge, 'challenge', text);
     this.challenge.classList.toggle('hidden', !text);

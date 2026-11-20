@@ -29,7 +29,6 @@ export const EIGHT_GATES = [
 
 const near = (pos, spot, distance) => Math.hypot(pos.x - spot.x, pos.z - spot.z) < distance;
 
-/** Whether the drone's nose points at the pilot, within `minCos` (cosine of the allowed angle). */
 export function isNoseIn(pos, heading, pilot, minCos = HOVER_SPOT.noseInCos) {
   const dx = pilot.x - pos.x;
   const dz = pilot.z - pos.z;
@@ -38,12 +37,16 @@ export function isNoseIn(pos, heading, pilot, minCos = HOVER_SPOT.noseInCos) {
   return (-Math.sin(heading) * dx - Math.cos(heading) * dz) / length >= minCos;
 }
 
-/** Hold a hover inside the ring with the nose towards the pilot as long as you can. */
 export function createHoverExercise() {
   const state = { streak: 0, best: 0, inside: false, noseIn: false };
   return {
     state,
     active: (pos) => near(pos, HOVER_SPOT, HOVER_SPOT.zone),
+    reset() {
+      state.streak = 0;
+      state.inside = false;
+      state.noseIn = false;
+    },
     /** @returns {{type:'end', seconds:number, best:boolean}|null} */
     update(dt, { pos, heading, pilot, armed, crashed, ground = 0 }) {
       const height = pos.y - ground;
@@ -68,12 +71,14 @@ export function landingPoints(distance) {
   return LANDING_SPOT.rings.find((ring) => distance <= ring.radius)?.points ?? 0;
 }
 
-/** Land on the target: points for how close to the centre the drone comes to rest. */
 export function createLandingExercise() {
   const state = { airborne: false, last: null, best: 0 };
   return {
     state,
     active: (pos) => near(pos, LANDING_SPOT, LANDING_SPOT.zone),
+    reset() {
+      state.airborne = false;
+    },
     /** @returns {{type:'landed', points:number, distance:number, best:boolean}|null} */
     update(dt, { pos, vel, grounded, armed, crashed, ground = 0 }) {
       if (crashed) {
@@ -94,7 +99,6 @@ export function createLandingExercise() {
   };
 }
 
-/** Fly figure eights around the two poles: through the middle, round the right pole, through the middle, round the left pole. */
 export function createEightExercise(groundAt = () => 0) {
   const state = { next: 0, time: 0, started: false, last: null, best: null, count: 0 };
   return {

@@ -60,11 +60,13 @@ describe('settings storage', () => {
       freestyle5: { lap: 31.2, points: 900, ghost: [1, 2, 3, 0] },
       whoop: { lap: 'fast', points: 1 },
       camera: { lap: 50, points: 400, ghost: [1, 'x'] },
+      mini: { lap: 40, points: 300, ghost: [1, 2, 3] },
       __proto__: { lap: 1, points: 1 },
       nope: { lap: 1, points: 1 },
     });
     const bests = loadRaceBests({ getItem: () => raw });
-    expect(Object.keys(bests).sort()).toEqual(['camera', 'freestyle5']);
+    expect(Object.keys(bests).sort()).toEqual(['camera', 'freestyle5', 'mini']);
+    expect(bests.mini.ghost).toEqual([]);
     expect(bests.freestyle5.ghost).toEqual([1, 2, 3, 0]);
     expect(bests.camera.ghost).toEqual([]);
   });

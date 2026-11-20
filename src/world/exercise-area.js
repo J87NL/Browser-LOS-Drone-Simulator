@@ -86,7 +86,6 @@ export function createExerciseArea(scene, collision) {
 
   scene.add(group);
   return {
-    /** Light up the hover ring while the hover counts. */
     update(hovering) {
       ringMat.emissiveIntensity = hovering ? 0.9 : 0.2;
       ringMat.emissive.set(hovering ? '#6ee07a' : '#4cc3ff');

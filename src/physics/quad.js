@@ -30,6 +30,7 @@ const _wW = new Vector3();
 const _vP = new Vector3();
 const _tmp = new Vector3();
 const _gpsForce = new Vector3();
+const deadband = (value) => (Math.abs(value) < GPS.stickDeadband ? 0 : value);
 const _vTarget = new Vector3();
 
 export class Quad {
@@ -217,14 +218,8 @@ export class Quad {
     }
   }
 
-  /**
-   * GPS mode: the sticks set a ground speed (and the throttle stick a climb
-   * rate) instead of a tilt. Centred sticks hold the position, also in wind.
-   * Leaves the wanted force in `_gpsForce` and returns the thrust fraction.
-   */
   _gpsThrust(cmd, dt) {
     const p = this.params;
-    const deadband = (v) => (Math.abs(v) < GPS.stickDeadband ? 0 : v);
     const pitch = deadband(cmd.pitch);
     const roll = deadband(cmd.roll);
     const climb = deadband(cmd.climb ?? 0);
@@ -282,7 +277,6 @@ export class Quad {
     this._steerUpTo(cmd, t);
   }
 
-  /** Rate targets that turn the body up axis towards `_upDes`, plus the yaw stick about world up. */
   _steerUpTo(cmd, t) {
     const p = this.params;
     const up = this.up(_up);

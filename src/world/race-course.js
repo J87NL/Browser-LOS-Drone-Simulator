@@ -114,7 +114,6 @@ export function createRaceCourse(scene, collision) {
   return {
     group,
     keepOut: [{ x: 50, z: -25, r: 26 }],
-    /** Light up the gate to fly through next. */
     update(time, nextGate) {
       frames.forEach((material, index) => {
         const isNext = index === nextGate;

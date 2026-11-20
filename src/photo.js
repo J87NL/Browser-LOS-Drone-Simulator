@@ -30,7 +30,7 @@ export function createRenderScaler(limits = RENDER_SCALE) {
   let fastWindows = 0;
   return {
     scale: limits.max,
-    /** @returns {boolean} whether the scale changed */
+    /** @returns {boolean} */
     sample(dt) {
       frames++;
       seconds += dt;

@@ -205,6 +205,8 @@ function resetDrone() {
   quad.reset(padSpawn());
   race.reset();
   eightExercise.reset();
+  hoverExercise.reset();
+  landingExercise.reset();
   lastRacePos.copy(quad.pos);
   stepper.reset();
   keyboard.throttle = 0;

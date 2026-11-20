@@ -2,9 +2,7 @@
 import { throttleCurve, hoverMappedStick } from './rates.js';
 
 /**
- * A GPS drone flies its "angle" position as GPS (position hold) and its
- * "acro" position as plain angle mode, like the P and A modes of a camera drone.
- * @param {'angle'|'acro'} mode the pilot's flight mode switch
+ * @param {'angle'|'acro'} mode
  * @param {{gps?: boolean}} preset
  * @returns {'angle'|'acro'|'gps'}
  */
@@ -13,7 +11,6 @@ export function effectiveFlightMode(mode, preset) {
   return mode === 'angle' ? 'gps' : 'angle';
 }
 
-/** Throttle stick 0..1 as a GPS climb command -1..1 (centre = hold height). */
 export function gpsClimb(rawThrottle) {
   return Math.min(1, Math.max(-1, (rawThrottle - 0.5) * 2));
 }

@@ -90,6 +90,8 @@ export function createGrass() {
       .replace('#include <common>', `#include <common>
         varying float vTip;
         varying float vTint;`)
+      .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
+        normal = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);`)
       .replace('#include <color_fragment>', `#include <color_fragment>
         diffuseColor.rgb *= mix(0.55, 1.0, vTip) * mix(0.85, 1.1, vTint);
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.2, 1.1, 0.65), step(0.92, vTint) * vTip * 0.4);`);
