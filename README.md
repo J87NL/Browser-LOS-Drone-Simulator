@@ -84,8 +84,9 @@ optional peer dependencies.
   props shows in the lower corners, as on many real builds. That works at low to normal uptilt
   (around 25°); at high uptilt the props drop out of the picture, as they would on a real quad.
 
-The drone is drawn 1.5× its real size by default so it is easier to see in LOS. Settings → "Drone
-size" changes this between 1× and 3×. Flight physics (mass, thrust, drag) keep the real size, but
+Settings → "Drone size" sets how big the drone is drawn, from 0.3× to 8×. At 1× (the default) it is
+drawn 2.5× its real size so it is easier to see in LOS; 0.4× is the real size. A bigger drone is
+handy for practice. Flight physics (mass, thrust, drag) keep the real size, but
 collisions follow the drawn size: spheres at the motors, around the prop discs and at both ends of
 the body make the arms and props of a bigger drone hit the ground and obstacles too, and a hard prop
 strike is a crash. (The sphere at the centre, which the drone rests on, keeps its real size.)
@@ -216,7 +217,7 @@ Esc opens the settings panel (the sim pauses while it is open):
 - Angle mode max tilt, throttle expo, hover-at-center.
 - Stick command arming on/off.
 - FPV uptilt and FOV, FPV front props in view, LOS auto-zoom on/off, LOS marker on/off.
-- Drone size (drawn size and collisions, 1× to 3×, default 1.5×; flight physics unchanged).
+- Drone size (drawn size and collisions, 0.3× to 8×, default 1× = 2.5× real size; flight physics unchanged).
 - Wind: speed (0 = calm, up to 15 m/s), direction it comes from (0 = in your face, 90 = from the right,
   270 = from the left) and gusts. The HUD shows the wind with an arrow, flags fly downwind and trees
   sway harder. Drag works on the speed relative to the air, so the quad drifts and you have to hold it

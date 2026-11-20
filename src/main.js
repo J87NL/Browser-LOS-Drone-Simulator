@@ -1,6 +1,6 @@
 // Bootstrap and main loop.
 import * as THREE from 'three';
-import { SIM, PRESETS, ARM, CAMERA, WORLD, INPUT } from './config.js';
+import { SIM, PRESETS, ARM, CAMERA, WORLD, INPUT, DRONE_SIZE_BASE } from './config.js';
 import { loadSettings, saveSettings } from './storage.js';
 import { FixedStepper } from './physics/stepper.js';
 import { Quad } from './physics/quad.js';
@@ -77,6 +77,7 @@ scene.add(drone.root);
 
 // --- Simulation -------------------------------------------------------------------
 const preset = () => PRESETS[settings.preset];
+const drawSize = () => settings.droneScale * DRONE_SIZE_BASE;
 const quad = new Quad(preset());
 const stepper = new FixedStepper(SIM.physicsHz, SIM.maxFrameDt);
 const padSpawn = () => new THREE.Vector3(PAD.x, PAD.top + preset().radius + 0.001, PAD.z);
@@ -142,7 +143,7 @@ let photoRequest = 0;
 
 function applySettings(key) {
   const all = key === 'all' || key === 'init';
-  if (all || key === 'preset' || key === 'droneSize') quad.setDrawScale(settings.droneSize);
+  if (all || key === 'preset' || key === 'droneScale') quad.setDrawScale(drawSize());
   if (all || key === 'preset') {
     quad.setParams(preset());
     resetDrone();
@@ -324,11 +325,11 @@ function frame(now) {
   // Visual size setting: scale the model and lift it so its feet sit on the
   // bottom of the collision sphere (world up, so an upside-down quad does
   // not sink into the ground either).
-  const scale = preset().modelScale * settings.droneSize;
+  const scale = preset().modelScale * drawSize();
   drone.root.scale.setScalar(scale);
   drone.root.quaternion.copy(renderQuat);
   drone.root.position.copy(renderPos);
-  drone.root.position.y += modelLift(preset(), settings.droneSize);
+  drone.root.position.y += modelLift(preset(), drawSize());
   rig.update(dt, renderPos, renderQuat, quad.heading, settings, scale, preset().modelScale, drone.root.position);
   const camDist = camera.position.distanceTo(renderPos);
   drone.update(quad.motor, paused ? 0 : dt, camDist, rig.mode === 'fpv');

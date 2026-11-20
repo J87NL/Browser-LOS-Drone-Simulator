@@ -1,6 +1,6 @@
 // localStorage helpers. Storage can be unavailable (private windows, blocked
 // site data); every access is wrapped so the sim still runs without it.
-import { DEFAULT_SETTINGS, PRESETS, SETTING_RANGES as RANGES } from './config.js';
+import { DEFAULT_SETTINGS, DRONE_SIZE_BASE, PRESETS, SETTING_RANGES as RANGES } from './config.js';
 
 const SETTINGS_KEY = 'fpvsim.settings.v1';
 const MAPPINGS_KEY = 'fpvsim.mappings.v1';
@@ -27,9 +27,18 @@ const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 /** Merge stored settings over defaults, keeping only known keys of the right type. */
+const LEGACY_DEFAULT_DRONE_SIZE = 1.5;
+
+function migrateDroneSize(stored) {
+  const legacy = stored.droneSize;
+  if (stored.droneScale !== undefined || !Number.isFinite(legacy) || legacy === LEGACY_DEFAULT_DRONE_SIZE) return stored;
+  return { ...stored, droneScale: legacy / DRONE_SIZE_BASE };
+}
+
 export function mergeSettings(stored) {
   const out = structuredClone(DEFAULT_SETTINGS);
   if (!isObj(stored)) return out;
+  stored = migrateDroneSize(stored);
   for (const [k, def] of Object.entries(DEFAULT_SETTINGS)) {
     const v = stored[k];
     if (v === undefined) continue;

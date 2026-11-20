@@ -24,14 +24,22 @@ describe('settings storage', () => {
     expect(s.fpvFov).toBe(60);
     expect(s.angleMaxTilt).toBe(80);
     expect(s.volume).toBe(1);
-    expect(mergeSettings({ droneSize: 10 }).droneSize).toBe(3);
-    expect(mergeSettings({ droneSize: 0.2 }).droneSize).toBe(1);
-    expect(mergeSettings({ droneSize: 'big' }).droneSize).toBe(DEFAULT_SETTINGS.droneSize);
+    expect(mergeSettings({ droneScale: 50 }).droneScale).toBe(8);
+    expect(mergeSettings({ droneScale: 0.1 }).droneScale).toBe(0.3);
+    expect(mergeSettings({ droneScale: 'big' }).droneScale).toBe(DEFAULT_SETTINGS.droneScale);
     expect(mergeSettings({ stickArm: 'no', fpvPropsInView: 1 })).toMatchObject({
       stickArm: DEFAULT_SETTINGS.stickArm, fpvPropsInView: DEFAULT_SETTINGS.fpvPropsInView,
     });
     expect(s.rates.yaw.center).toBe(0);
     expect(s.rates.yaw.expo).toBe(1);
+  });
+
+  it('converts the old drone size to the new scale', () => {
+    expect(mergeSettings({ droneSize: 3 }).droneScale).toBeCloseTo(1.2);
+    expect(mergeSettings({ droneSize: 1 }).droneScale).toBeCloseTo(0.4);
+    expect(mergeSettings({ droneSize: 1.5 }).droneScale).toBe(DEFAULT_SETTINGS.droneScale);
+    expect(mergeSettings({ droneSize: 3, droneScale: 2 }).droneScale).toBe(2);
+    expect(mergeSettings({ droneSize: 3 }).droneSize).toBeUndefined();
   });
 
   it('survives a throwing storage', () => {

@@ -175,6 +175,8 @@ export const WORLD = {
   seed: 1337,
 };
 
+export const DRONE_SIZE_BASE = 2.5;
+
 export const DEFAULT_SETTINGS = {
   preset: DEFAULT_PRESET,
   rates: structuredClone(DEFAULT_RATES),
@@ -187,7 +189,7 @@ export const DEFAULT_SETTINGS = {
   fpvPropsInView: false,
   losAutoZoom: true,
   losMarker: true,
-  droneSize: 1.5, // drawn size; collisions follow it, flight physics do not
+  droneScale: 1, // drawn size; collisions follow it, flight physics do not
   windSpeed: 0, // m/s, 0 = calm
   windFrom: 90, // degrees clockwise from straight ahead of the pilot: 90 = crosswind from the right
   windGusts: 0.4, // 0 = steady, 1 = very gusty
@@ -204,7 +206,7 @@ export const SETTING_RANGES = {
   fpvUptilt: [-10, 60],
   fpvFov: [60, 150],
   volume: [0, 1],
-  droneSize: [1, 3],
+  droneScale: [0.3, 8],
   windSpeed: [0, 15],
   windFrom: [0, 359],
   windGusts: [0, 1],
