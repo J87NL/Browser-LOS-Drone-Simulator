@@ -85,6 +85,18 @@ yellow; gates only count in order and in the right direction. Each gate is worth
 best lap per preset is kept in the browser, and from then on a see-through ghost flies that lap
 alongside you.
 
+### LOS exercises
+
+Near the pad are three exercises. The HUD shows one as soon as you fly close to it, and keeps the
+best result per preset in the browser.
+
+- **Nose-in hover** (blue rings, right of the pad): hover between the two rings (1.5 to 3.5 m up)
+  with the nose towards you. The rings turn green while the time counts.
+- **Precision landing** (target, left of the pad): lift off at least 1 m and land on the target.
+  100 points in the bullseye, 50, 25 and 10 for the outer rings.
+- **Figure eight** (two yellow/black poles ahead): through the middle away from you, round the right
+  pole, through the middle again, round the left pole and back through the middle. Times each eight.
+
 ### Cameras
 
 - **LOS** (default): you stand 1.7 m tall a few metres behind the pad and look at the quad.
@@ -290,8 +302,10 @@ src/
   input/               gamepad.js (polling, storage), mapping.js (pure mapping logic), keyboard.js, input.js,
                        gesture.js (stick command arming)
   world/               terrain, distant hills, sky, lights, trees, grass (photo quality), course (pad,
-                       gates, poles, flags, tower), race-course (numbered gates, cones, ghost)
+                       gates, poles, flags, tower), race-course (numbered gates, cones, ghost),
+                       exercise-area (hover rings, landing target, figure-eight poles)
   race/race.js         gate crossing, lap timing, points, ghost recording (pure logic)
+  race/exercises.js    nose-in hover, precision landing and figure-eight scoring (pure logic)
   drone/model.js       procedural quad (carbon frame, motors, props, battery, camera), prop animation, LEDs
   drone/camera-drone.js  procedural GPS camera drone (shell, landing skids, gimbal)
   ui/                  HUD, settings, calibration screen + stick guide, toasts, LOS marker, debug overlay

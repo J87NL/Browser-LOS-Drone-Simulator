@@ -1,7 +1,7 @@
 // Bootstrap and main loop.
 import * as THREE from 'three';
 import { SIM, PRESETS, ARM, CAMERA, WORLD, INPUT, DRONE_SIZE_BASE } from './config.js';
-import { loadRaceBests, loadSettings, saveRaceBests, saveSettings } from './storage.js';
+import { loadExerciseBests, loadRaceBests, loadSettings, saveExerciseBests, saveRaceBests, saveSettings } from './storage.js';
 import { FixedStepper } from './physics/stepper.js';
 import { Quad } from './physics/quad.js';
 import { CollisionWorld } from './physics/colliders.js';
@@ -16,6 +16,8 @@ import { createTrees } from './world/trees.js';
 import { createCourse, PAD } from './world/course.js';
 import { createGhostModel, createRaceCourse } from './world/race-course.js';
 import { RACE_GATES, createGhostRecorder, createRace, ghostPose } from './race/race.js';
+import { createEightExercise, createHoverExercise, createLandingExercise } from './race/exercises.js';
+import { createExerciseArea } from './world/exercise-area.js';
 import { createCameraDroneModel } from './drone/camera-drone.js';
 import { createDroneModel, modelLift } from './drone/model.js';
 import { CameraRig, CAMERA_LABELS } from './cameras.js';
@@ -80,6 +82,11 @@ const ghostRecorder = createGhostRecorder();
 const ghost = createGhostModel();
 scene.add(ghost);
 const raceBests = loadRaceBests();
+const exerciseArea = createExerciseArea(scene, collision);
+const hoverExercise = createHoverExercise();
+const landingExercise = createLandingExercise();
+const eightExercise = createEightExercise(terrainHeight);
+const exerciseBests = loadExerciseBests();
 const lastRacePos = new THREE.Vector3();
 
 const droneModels = new Map();
@@ -197,6 +204,7 @@ function applySettings(key) {
 function resetDrone() {
   quad.reset(padSpawn());
   race.reset();
+  eightExercise.reset();
   lastRacePos.copy(quad.pos);
   stepper.reset();
   keyboard.throttle = 0;
@@ -205,7 +213,60 @@ function resetDrone() {
 
 const formatSeconds = (seconds) => `${seconds.toFixed(1)} s`;
 
+function exerciseBest(field) {
+  return exerciseBests[settings.preset]?.[field];
+}
+
+function recordExercise(field, value, better) {
+  const current = exerciseBest(field);
+  if (!Number.isFinite(current) || better(value, current)) {
+    exerciseBests[settings.preset] = { ...exerciseBests[settings.preset], [field]: +value.toFixed(2) };
+    saveExerciseBests(exerciseBests);
+    return true;
+  }
+  return false;
+}
+
+function updateExercises(dt) {
+  const ground = terrainHeight(quad.pos.x, quad.pos.z);
+  const flying = {
+    pos: quad.pos, vel: quad.vel, heading: quad.heading, pilot: rig.pilot, armed: quad.armed,
+    crashed: !!quad.crashed, grounded: quad.grounded, ground, from: lastRacePos, to: quad.pos,
+  };
+  const hover = hoverExercise.update(dt, flying);
+  if (hover && hover.seconds >= 1) {
+    const record = recordExercise('hover', hover.seconds, (a, b) => a > b);
+    toasts.show(`Nose-in hover ${formatSeconds(hover.seconds)}${record ? ' · new best!' : ''}`, 2500);
+  }
+  const landed = landingExercise.update(dt, flying);
+  if (landed) {
+    const record = landed.points > 0 && recordExercise('landing', landed.points, (a, b) => a > b);
+    toasts.show(`Landing ${landed.distance.toFixed(2)} m from the centre: ${landed.points} points${record ? ' · new best!' : ''}`, 3000);
+  }
+  const eight = eightExercise.update(dt, flying);
+  if (eight) {
+    const record = recordExercise('eight', eight.seconds, (a, b) => a < b);
+    toasts.show(`Figure eight in ${formatSeconds(eight.seconds)}${record ? ' · new best!' : ''}`, 2500);
+  }
+  const { inside, noseIn, streak } = hoverExercise.state;
+  exerciseArea.update(inside && noseIn);
+
+  const best = (field, format) => (Number.isFinite(exerciseBest(field)) ? ` · best ${format(exerciseBest(field))}` : '');
+  if (hoverExercise.active(quad.pos)) {
+    const hint = inside && !noseIn ? ' · turn the nose to you' : '';
+    return `NOSE-IN HOVER ${formatSeconds(streak)}${hint}${best('hover', formatSeconds)}`;
+  }
+  if (landingExercise.active(quad.pos)) return `PRECISION LANDING lift off and land on the target${best('landing', (p) => `${p} pts`)}`;
+  if (eightExercise.active(quad.pos)) {
+    const { started, time, next } = eightExercise.state;
+    const step = ['through the middle (away from you)', 'round the right pole', 'through the middle', 'round the left pole'][next];
+    return `FIGURE 8 ${started ? formatSeconds(time) : ''} next: ${step}${best('eight', formatSeconds)}`;
+  }
+  return '';
+}
+
 function updateRace(dt) {
+  const exerciseText = updateExercises(dt);
   for (const event of race.update(dt, lastRacePos, quad.pos, !!quad.crashed)) {
     if (event.type === 'start') {
       ghostRecorder.start();
@@ -230,7 +291,7 @@ function updateRace(dt) {
   const nearStart = Math.hypot(quad.pos.x - start.x, quad.pos.z - start.z) < 35;
   const bestText = best ? ` · best ${formatSeconds(best.lap)}` : '';
   if (running) hud.setChallenge(`RACE gate ${next === 0 ? 'FINISH' : `${next}/${race.gateCount - 1}`} · ${formatSeconds(time - lapStart)} · ${points} pts${bestText}`);
-  else hud.setChallenge(nearStart ? `RACE fly through START to begin${bestText}` : '');
+  else hud.setChallenge(exerciseText || (nearStart ? `RACE fly through START to begin${bestText}` : ''));
 }
 
 function finishLap(event) {

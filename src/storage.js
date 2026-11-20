@@ -5,6 +5,8 @@ import { DEFAULT_SETTINGS, DRONE_SIZE_BASE, PRESETS, SETTING_RANGES as RANGES } 
 const SETTINGS_KEY = 'fpvsim.settings.v1';
 const MAPPINGS_KEY = 'fpvsim.mappings.v1';
 const RACE_KEY = 'fpvsim.race.v1';
+const EXERCISES_KEY = 'fpvsim.exercises.v1';
+const EXERCISE_FIELDS = ['hover', 'landing', 'eight'];
 
 export function readJSON(key, storage = globalThis.localStorage) {
   try {
@@ -87,6 +89,25 @@ export function loadRaceBests(storage = globalThis.localStorage) {
 
 export function saveRaceBests(bests, storage = globalThis.localStorage) {
   return writeJSON(RACE_KEY, bests, storage);
+}
+
+/** Exercise bests per preset: { [preset]: { hover?, landing?, eight? } }, numbers only. */
+export function loadExerciseBests(storage = globalThis.localStorage) {
+  const stored = readJSON(EXERCISES_KEY, storage);
+  const bests = Object.create(null);
+  if (!isObj(stored)) return bests;
+  for (const [preset, best] of Object.entries(stored)) {
+    if (!Object.hasOwn(PRESETS, preset) || !isObj(best)) continue;
+    bests[preset] = {};
+    for (const field of EXERCISE_FIELDS) {
+      if (Number.isFinite(best[field])) bests[preset][field] = best[field];
+    }
+  }
+  return bests;
+}
+
+export function saveExerciseBests(bests, storage = globalThis.localStorage) {
+  return writeJSON(EXERCISES_KEY, bests, storage);
 }
 
 export function loadMappings() {
