@@ -4,6 +4,8 @@ A browser quadcopter simulator for flying **line of sight** (LOS): you stand on 
 the quad with your own eyes, the way you learn on a real one. Chase and FPV cameras are there too.
 It works with a USB gamepad, an RC transmitter (EdgeTX/OpenTX in USB joystick mode) or the keyboard.
 
+**Demo: [fly.j87.nl](https://fly.j87.nl)** (Chrome or Edge recommended for controllers).
+
 Vite, vanilla JavaScript and three.js. The flight model is written by hand (no physics engine) and
 runs at a fixed 500 Hz, independent of the frame rate.
 
@@ -125,7 +127,12 @@ learning). Turn it off to get the plain linear range in angle mode as well.
 ## Linux / Ubuntu notes
 
 - EdgeTX/OpenTX radios in **USB Joystick (HID)** mode show up as ordinary joysticks and work in
-  Chromium/Chrome and Firefox. Choose "USB Joystick" on the radio when you plug it in.
+  Chromium/Chrome. Choose "USB Joystick" on the radio when you plug it in.
+- Firefox does not read every controller. Some generic RC USB dongles (for example one that
+  reports itself as `ADC`, 0402:0402) work in Chrome but never reach the page in Firefox, even with
+  the snap joystick interface connected. A page cannot see a USB device the browser does not hand
+  over, so the sim cannot detect this. Instead, while no controller is found, the HUD and the
+  setup screen show a hint, and in Firefox and Safari that hint says to use Chrome or Edge.
 - If the controller you are flying with disconnects while armed, the quad disarms (failsafe).
   Disconnecting another, idle controller does nothing.
 - Browsers sometimes only report a controller after you press a button or move a stick on it.
