@@ -1,0 +1,85 @@
+name: deploy
+
+on:
+  push:
+    branches:
+      - production
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload build
+        uses: actions/upload-artifact@v7
+        with:
+          name: site
+          path: public
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download build
+        uses: actions/download-artifact@v8
+        with:
+          name: site
+          path: public
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: '8.5'
+          tools: composer:v2
+          coverage: none
+
+      - name: Install Deployer
+        run: |
+          mkdir -p "$RUNNER_TEMP/deployer"
+          composer require --working-dir="$RUNNER_TEMP/deployer" --no-interaction --ansi "deployer/deployer:7.5.12"
+
+      - name: Deploy to Production
+        uses: deployphp/action@v1
+        with:
+          private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          deployer-binary: ${{ runner.temp }}/deployer/vendor/bin/dep
+          dep: deploy

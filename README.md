@@ -191,6 +191,14 @@ server {
 }
 ```
 
+### Production: fly.j87.nl
+
+A push to the `production` branch runs `.github/workflows/deploy.yml`: lint, tests and build, then
+Deployer (`deploy.php`) uploads `public/` as a new release to `j87.nl:/var/www/fly.j87.nl` and
+switches the `current` symlink. The web server's document root is
+`/var/www/fly.j87.nl/current/public`. Three releases are kept; `dep rollback` switches back to the
+previous one. The repository needs the `SSH_PRIVATE_KEY` secret of the `deploy` user.
+
 ## Settings
 
 Esc opens the settings panel (the sim pauses while it is open):
