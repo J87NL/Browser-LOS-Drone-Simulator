@@ -258,7 +258,7 @@ export function describeBinding(b) {
 /** Validate/repair a mapping loaded from storage. Returns null if unusable. */
 export function sanitizeMapping(m) {
   if (!m || typeof m !== 'object' || !m.axes || !m.buttons) return null;
-  const out = defaultMapping(false, m.stickMode ?? 2);
+  const out = defaultMapping(false, [1, 2, 3, 4].includes(m.stickMode) ? m.stickMode : 2);
   out.deadzone = Number.isFinite(m.deadzone) ? clamp(m.deadzone, 0, 0.5) : INPUT.deadzone;
   for (const s of STICKS) {
     const a = m.axes[s];

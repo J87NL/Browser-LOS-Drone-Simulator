@@ -179,6 +179,13 @@ describe('sanitizeMapping', () => {
     expect(m.deadzone).toBe(0.5);
   });
 
+  it('falls back to mode 2 for a stored stick mode that does not exist', () => {
+    const base = { axes: {}, buttons: {} };
+    expect(sanitizeMapping({ ...base, stickMode: 7 }).stickMode).toBe(2);
+    expect(sanitizeMapping({ ...base, stickMode: '3' }).stickMode).toBe(2);
+    expect(sanitizeMapping({ ...base, stickMode: 4 }).stickMode).toBe(4);
+  });
+
   it('round-trips through JSON', () => {
     const m = defaultMapping(true, 3);
     expect(sanitizeMapping(JSON.parse(JSON.stringify(m)))).toEqual(m);
