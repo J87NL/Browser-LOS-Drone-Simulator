@@ -224,6 +224,7 @@ window.addEventListener('keydown', (e) => {
   }
 });
 window.addEventListener('pointerdown', () => sound.unlock());
+document.addEventListener('visibilitychange', () => sound.setHidden(document.hidden));
 function resize() {
   const pr = Math.min(devicePixelRatio, settings.lowQuality ? 1 : 2);
   camera.aspect = innerWidth / innerHeight;

@@ -37,6 +37,15 @@ export class MotorSound {
     if (this.ctx?.state === 'suspended') this.ctx.resume();
   }
 
+  setHidden(hidden) {
+    if (!this.ctx) return;
+    if (hidden) {
+      this.ctx.suspend();
+      return;
+    }
+    if (this.volume > 0) this.ctx.resume();
+  }
+
   setVolume(v) {
     this.volume = v;
     if (v > 0) this.unlock();
