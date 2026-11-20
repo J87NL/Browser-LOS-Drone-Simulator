@@ -8,7 +8,7 @@ require 'recipe/common.php';
 require 'contrib/rsync.php';
 
 host('j87.nl')
-    ->setRemoteUser('deploy')
+    ->setRemoteUser('deploy-fly')
     ->setDeployPath('/var/www/fly.j87.nl')
     ->setLabels(['stage' => 'production'])
     ->set('rsync_src', __DIR__.'/public')
