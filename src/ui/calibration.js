@@ -7,6 +7,7 @@ import {
   describeBinding, defaultMapping, modePreset, mapGamepad, snapshot, heldAtEnd, assignDetectedAxis,
 } from '../input/mapping.js';
 import { stickGuide } from './stick-guide.js';
+import { controllerHint } from '../input/browser-hint.js';
 
 
 export class CalibrationScreen {
@@ -220,7 +221,8 @@ export class CalibrationScreen {
     if (!this.gamepads.supported || !gp) {
       this.liveEls = null;
       this.el.replaceChildren(h('div', { class: 'dialog panel' }, header,
-        h('p', { text: this.gamepads.supported ? 'No controller detected. Plug it in and press any button or move a stick.' : 'This browser does not support the Gamepad API.' }),
+        this.gamepads.supported && h('p', { text: 'No controller detected. Plug it in and press any button or move a stick.' }),
+        h('p', { class: 'warn', text: controllerHint(navigator.userAgent, this.gamepads.supported) }),
         h('p', { class: 'muted', text: 'RC transmitters: select USB joystick (HID) mode on the radio when connecting. On Ubuntu, snap-packaged browsers may not see joysticks; see the README.' }),
       ));
       return;

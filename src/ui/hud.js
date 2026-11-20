@@ -18,6 +18,7 @@ export class Hud {
     this.speed = h('span', { class: 'hud-num' });
     this.alt = h('span', { class: 'hud-num' });
     this.source = h('div', { class: 'hud-source' });
+    this.hint = h('div', { class: 'hud-hint hidden', role: 'status' });
     this.el = h(
       'div',
       { class: 'hud panel' },
@@ -31,6 +32,7 @@ export class Hud {
         (this.windArrow = h('span', { class: 'wind-arrow', text: '↑', 'aria-hidden': 'true' })),
         (this.windText = h('span', { class: 'hud-num' })))),
       this.source,
+      this.hint,
     );
     this.crash = h('div', { class: 'crash panel hidden' });
     this.paused = h('div', { class: 'paused hidden', text: 'Paused' });
@@ -49,7 +51,7 @@ export class Hud {
     if (cls !== undefined) el.dataset.state = cls;
   }
 
-  update({ armed, mode, camera, throttle, speed, altitude, crashed, source, paused, armProgress = 0, sticksLocked = false, wind = null }) {
+  update({ armed, mode, camera, throttle, speed, altitude, crashed, source, hint = '', paused, armProgress = 0, sticksLocked = false, wind = null }) {
     // While a stick-command hold is in progress, show how far along it is.
     const holding = armProgress > 0 ? ` ${'▮'.repeat(Math.ceil(armProgress * 5)).padEnd(5, '▯')}` : '';
     let label = armProgress > 0 ? (armed ? 'DISARMING' : 'ARMING') + holding : armed ? 'ARMED' : 'DISARMED';
@@ -71,6 +73,8 @@ export class Hud {
     }
     this.windRow.classList.toggle('hidden', !(ws > 0.05));
     this._set(this.source, 'src', source);
+    this._set(this.hint, 'hint', hint);
+    this.hint.classList.toggle('hidden', !hint);
     const crashText = crashed ? `Crashed at ${crashed.speed.toFixed(1)} m/s. Press reset (R) to go back to the pad.` : '';
     this._set(this.crash, 'crash', crashText);
     this.crash.classList.toggle('hidden', !crashed);

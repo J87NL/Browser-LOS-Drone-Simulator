@@ -17,6 +17,7 @@ import { createCourse, PAD } from './world/course.js';
 import { createDroneModel, modelLift } from './drone/model.js';
 import { CameraRig, CAMERA_LABELS } from './cameras.js';
 import { GamepadManager } from './input/gamepad.js';
+import { controllerHint } from './input/browser-hint.js';
 import { Keyboard } from './input/keyboard.js';
 import { InputManager, shouldFailsafe } from './input/input.js';
 import { ArmGesture, releaseStickLock } from './input/gesture.js';
@@ -86,6 +87,7 @@ const rig = new CameraRig(camera, terrainHeight);
 
 // --- Input & UI --------------------------------------------------------------------
 const gamepads = new GamepadManager();
+const noControllerHint = controllerHint(navigator.userAgent, gamepads.supported);
 const keyboard = new Keyboard(window);
 const input = new InputManager(gamepads, keyboard);
 const sound = new MotorSound();
@@ -349,6 +351,7 @@ function frame(now) {
     altitude: Math.max(0, quad.pos.y - preset().radius - ground),
     crashed: quad.crashed,
     source: state.source === 'gamepad' ? `🎮 ${state.gamepadId}` : '⌨ keyboard',
+    hint: state.source === 'gamepad' ? '' : noControllerHint,
     paused,
     armProgress: armGesture.progress,
     sticksLocked: armGesture.sticksLocked,

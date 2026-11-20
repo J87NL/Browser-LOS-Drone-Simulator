@@ -8,6 +8,7 @@
   --bad: #ff4d5e;
   --acro: #ffb020;
   --angle: #4cc3ff;
+  --warn: #ffb347;
   --font: system-ui, -apple-system, 'Segoe UI', Ubuntu, Roboto, sans-serif;
   --mono: ui-monospace, 'SFMono-Regular', 'Ubuntu Mono', Menlo, monospace;
 }
@@ -42,6 +43,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #c8d8e6; col
 .hud-num { font: 600 15px/1 var(--mono); min-width: 70px; }
 .thr-bar { flex: 1; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.16); overflow: hidden; }
 .thr-fill { height: 100%; background: linear-gradient(90deg, var(--ok), var(--acro), var(--bad)); transform-origin: left; transform: scaleX(0); }
+.hud-hint { margin-top: 6px; color: var(--warn); font-size: 12px; line-height: 1.35; max-width: 320px; white-space: normal; }
 .hud-source { color: var(--muted); font-size: 11px; max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .help { position: absolute; left: 12px; bottom: 12px; padding: 6px 10px; font-size: 12px; color: var(--muted); max-width: calc(100% - 24px); pointer-events: none; }
