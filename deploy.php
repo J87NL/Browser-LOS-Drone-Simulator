@@ -21,6 +21,14 @@ host('j87.nl')
         '-o ServerAliveCountMax=4',
     ]);
 
+add('rsync', [
+    'flags' => 'rzp',
+    'options' => [
+        'delete',
+        'chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r',
+    ],
+]);
+
 set('shared_dirs', []);
 set('shared_files', []);
 set('writable_dirs', []);
