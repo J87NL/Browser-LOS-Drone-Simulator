@@ -1,6 +1,7 @@
 // Minimal HUD: armed state, flight mode, camera, throttle bar, speed, altitude.
 import { h } from './dom.js';
 import { CAMERA_LABELS } from '../cameras.js';
+import { FLIGHT_MODE_LABELS } from '../physics/controls.js';
 
 /** Continue `raw` (degrees) from `last` the short way round, so a CSS rotation never spins 360°. */
 export function unwrapDegrees(last, raw) {
@@ -57,7 +58,7 @@ export class Hud {
     let label = armProgress > 0 ? (armed ? 'DISARMING' : 'ARMING') + holding : armed ? 'ARMED' : 'DISARMED';
     if (armed && sticksLocked && !(armProgress > 0)) label = 'ARMED · CENTER STICKS';
     this._set(this.armed, 'armed', label, armed ? 'on' : 'off');
-    this._set(this.mode, 'mode', mode === 'acro' ? 'ACRO' : 'ANGLE', mode);
+    this._set(this.mode, 'mode', FLIGHT_MODE_LABELS[mode], mode);
     this._set(this.cam, 'cam', CAMERA_LABELS[camera], camera);
     this.thrFill.style.transform = `scaleX(${throttle.toFixed(3)})`;
     this._set(this.thrText, 'thr', `${Math.round(throttle * 100)}%`);

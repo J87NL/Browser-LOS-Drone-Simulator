@@ -71,6 +71,10 @@ optional peer dependencies.
   about 3 m/s (scraping along it counts too), or slamming into the ground, the pad or the top of
   something at more than about 7 m/s. Press reset to go back to the pad. A gentle touch or a firm
   landing just bounces. The beginner preset is a bit stricter, the tiny whoop more forgiving.
+- The GPS presets (a camera drone of Phantom size and a 249 g mini) fly like a camera drone: in
+  angle mode (shown as **GPS**) the sticks set a speed (up to 15 m/s) and the throttle stick a climb
+  rate (centre holds the height). Let go and the drone brakes and holds its position, also in wind.
+  The acro position of the flight mode switch flies these drones in plain angle mode.
 
 ### Cameras
 
@@ -211,7 +215,8 @@ previous one. The repository needs the `SSH_PRIVATE_KEY` secret of the `deploy` 
 
 Esc opens the settings panel (the sim pauses while it is open):
 
-- Physics preset: Beginner, 5" freestyle, Tiny whoop. Choosing a preset also loads its rates.
+- Physics preset: Beginner, 5" freestyle, Tiny whoop, 7" long range, 3" cinewhoop, GPS camera drone
+  (Phantom size), GPS mini drone (249 g). Choosing a preset also loads its rates.
 - Rates per axis, Betaflight "actual rates" style: center sensitivity, max rate (deg/s) and expo.
   Defaults: roll/pitch 200/670, yaw 200/500.
 - Angle mode max tilt, throttle expo, hover-at-center.
@@ -248,6 +253,8 @@ mappings are kept; reset those per device in the setup screen).
   follows with a first-order response (about 30 ms), standing in for a tuned PID loop.
 - Angle mode: sticks give a target tilt relative to the current heading (a corner stick is capped at
   max tilt too); yaw stays rate based, about the world vertical so turning does not cost tilt.
+- GPS mode: a velocity controller (with integral, drag feed-forward and position hold when the sticks
+  are centred) picks the thrust vector; the attitude then follows it like in angle mode.
 - Collisions: a sphere at the centre plus spheres at the motors, prop rims and body (sized with the
   drawn drone; props flex, so they do not bounce) against the
   heightfield ground, boxes and vertical cylinders (gates, poles, trees, tower). A motor hit also

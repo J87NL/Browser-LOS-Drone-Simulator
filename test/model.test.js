@@ -24,6 +24,16 @@ describe('drone model placement', () => {
     expect(box.min.y).toBeCloseTo(-FEET_DEPTH, 4);
   });
 
+  it('the camera drone skids sit at FEET_DEPTH too', async () => {
+    const { createCameraDroneModel } = await import('../src/drone/camera-drone.js');
+    const { FEET_DEPTH } = await import('../src/drone/model.js');
+    const { root } = createCameraDroneModel();
+    const box = new Box3();
+    root.updateMatrixWorld(true);
+    root.traverse((o) => { if (o.isMesh) box.expandByObject(o); });
+    expect(box.min.y).toBeCloseTo(-FEET_DEPTH, 4);
+  });
+
   it('feet rest on the collision sphere bottom for every preset and size', async () => {
     const { modelLift, FEET_DEPTH } = await import('../src/drone/model.js');
     for (const p of Object.values(PRESETS)) {

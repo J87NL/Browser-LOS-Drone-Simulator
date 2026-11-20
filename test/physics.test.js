@@ -3,8 +3,9 @@ import { Vector3, PerspectiveCamera } from 'three';
 import { CameraRig } from '../src/cameras.js';
 import { FixedStepper } from '../src/physics/stepper.js';
 import { Quad } from '../src/physics/quad.js';
+import { effectiveFlightMode, gpsClimb } from '../src/physics/controls.js';
 import { CollisionWorld } from '../src/physics/colliders.js';
-import { PRESETS, DEFAULT_RATES, GRAVITY } from '../src/config.js';
+import { PRESETS, DEFAULT_RATES, GRAVITY, GPS } from '../src/config.js';
 
 const P = PRESETS.freestyle5;
 const flat = () => new CollisionWorld(() => 0);
@@ -417,6 +418,65 @@ describe('Quad flight model', () => {
     q.armed = false;
     for (let i = 0; i < 50; i++) q.step(0.002, cmd({ thrust: 1 }));
     expect(q.vel.y).toBeLessThan(0);
+  });
+});
+
+describe('GPS mode', () => {
+  const G = PRESETS.camera;
+  const gps = (o = {}) => cmd({ mode: 'gps', climb: 0, ...o });
+  function gpsAirborne(height = 30) {
+    const q = new Quad(G);
+    q.reset(new Vector3(0, height, 0));
+    q.armed = true;
+    q.thrust = G.mass * GRAVITY;
+    return q;
+  }
+  const fly = (q, c, seconds, world) => {
+    for (let i = 0; i < seconds * 500; i++) q.step(0.002, c, world);
+  };
+
+  it('holds its position and height with centred sticks, also in wind', () => {
+    const q = gpsAirborne();
+    q.wind.set(6, 0, -3);
+    fly(q, gps(), 15);
+    expect(Math.hypot(q.pos.x, q.pos.z)).toBeLessThan(1.5);
+    expect(Math.abs(q.pos.y - 30)).toBeLessThan(1);
+    expect(q.vel.length()).toBeLessThan(0.3);
+  });
+
+  it('flies forward at about the max speed and brakes to a stop when the stick is released', () => {
+    const q = gpsAirborne();
+    fly(q, gps({ pitch: 1 }), 8);
+    expect(-q.vel.z).toBeGreaterThan(GPS.maxSpeed * 0.85);
+    expect(-q.vel.z).toBeLessThan(GPS.maxSpeed * 1.1);
+    fly(q, gps(), 6);
+    expect(q.vel.length()).toBeLessThan(0.3);
+  });
+
+  it('climbs and descends at the set rates with the throttle stick', () => {
+    const q = gpsAirborne();
+    fly(q, gps({ climb: 1 }), 4);
+    expect(q.vel.y).toBeCloseTo(GPS.climbRate, 0);
+    fly(q, gps({ climb: -1 }), 4);
+    expect(q.vel.y).toBeCloseTo(-GPS.descentRate, 0);
+  });
+
+  it('flies the angle switch position as GPS and the acro position as angle', () => {
+    expect(effectiveFlightMode('angle', G)).toBe('gps');
+    expect(effectiveFlightMode('acro', G)).toBe('angle');
+    expect(effectiveFlightMode('acro', P)).toBe('acro');
+    expect(gpsClimb(0.5)).toBe(0);
+    expect(gpsClimb(0)).toBe(-1);
+  });
+
+  it('takes off from the ground only when the throttle stick goes above centre', () => {
+    const q = new Quad(G);
+    q.reset(new Vector3(0, G.radius, 0));
+    q.armed = true;
+    fly(q, gps({ pitch: 1 }), 2, flat());
+    expect(q.pos.y).toBeLessThan(G.radius + 0.05);
+    fly(q, gps({ climb: 1 }), 2, flat());
+    expect(q.pos.y).toBeGreaterThan(3);
   });
 });
 

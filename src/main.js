@@ -5,7 +5,7 @@ import { loadSettings, saveSettings } from './storage.js';
 import { FixedStepper } from './physics/stepper.js';
 import { Quad } from './physics/quad.js';
 import { CollisionWorld } from './physics/colliders.js';
-import { shapeThrottle } from './physics/controls.js';
+import { FLIGHT_MODE_LABELS, effectiveFlightMode, gpsClimb, shapeThrottle } from './physics/controls.js';
 import { windAt } from './physics/wind.js';
 import { terrainHeight } from './world/terrain-height.js';
 import { createTerrain } from './world/terrain.js';
@@ -14,6 +14,7 @@ import { createSky } from './world/sky.js';
 import { createLights } from './world/lights.js';
 import { createTrees } from './world/trees.js';
 import { createCourse, PAD } from './world/course.js';
+import { createCameraDroneModel } from './drone/camera-drone.js';
 import { createDroneModel, modelLift } from './drone/model.js';
 import { CameraRig, CAMERA_LABELS } from './cameras.js';
 import { GamepadManager } from './input/gamepad.js';
@@ -72,12 +73,23 @@ const collision = new CollisionWorld(terrainHeight);
 const course = createCourse(scene, collision);
 const trees = createTrees(scene, collision, course.keepOut);
 
-const drone = createDroneModel();
-scene.add(drone.root);
+const droneModels = new Map();
+let drone = null;
 
 // --- Simulation -------------------------------------------------------------------
 const preset = () => PRESETS[settings.preset];
 const drawSize = () => settings.droneScale * DRONE_SIZE_BASE;
+function useDroneModel() {
+  const p = preset();
+  const key = p.model === 'camera' ? `camera:${p.shell}` : 'fpv';
+  if (!droneModels.has(key)) droneModels.set(key, p.model === 'camera' ? createCameraDroneModel({ shell: p.shell }) : createDroneModel());
+  const next = droneModels.get(key);
+  if (drone === next) return;
+  if (drone) scene.remove(drone.root);
+  drone = next;
+  scene.add(drone.root);
+}
+useDroneModel();
 const quad = new Quad(preset());
 const stepper = new FixedStepper(SIM.physicsHz, SIM.maxFrameDt);
 const padSpawn = () => new THREE.Vector3(PAD.x, PAD.top + preset().radius + 0.001, PAD.z);
@@ -145,6 +157,7 @@ function applySettings(key) {
   const all = key === 'all' || key === 'init';
   if (all || key === 'preset' || key === 'droneScale') quad.setDrawScale(drawSize());
   if (all || key === 'preset') {
+    useDroneModel();
     quad.setParams(preset());
     resetDrone();
   }
@@ -207,12 +220,12 @@ function handleEvent(ev, state) {
       break;
     case 'flightModeToggle':
       flightMode = flightMode === 'angle' ? 'acro' : 'angle';
-      toasts.show(`Flight mode: ${flightMode.toUpperCase()}`, 1200);
+      toasts.show(`Flight mode: ${FLIGHT_MODE_LABELS[effectiveFlightMode(flightMode, preset())]}`, 1200);
       break;
     case 'acro':
     case 'angle':
       flightMode = ev;
-      toasts.show(`Flight mode: ${flightMode.toUpperCase()}`, 1200);
+      toasts.show(`Flight mode: ${FLIGHT_MODE_LABELS[effectiveFlightMode(flightMode, preset())]}`, 1200);
       break;
     case 'reset':
       resetDrone();
@@ -296,7 +309,8 @@ function frame(now) {
   }
   calibration.update();
 
-  cmd.mode = flightMode;
+  cmd.mode = effectiveFlightMode(flightMode, preset());
+  cmd.climb = gpsClimb(state.throttle);
   cmd.rates = settings.rates;
   cmd.angleMaxTilt = settings.angleMaxTilt;
   const locked = armGesture.sticksLocked;
@@ -304,7 +318,7 @@ function frame(now) {
   cmd.pitch = locked ? 0 : state.pitch;
   cmd.yaw = locked ? 0 : state.yaw;
   cmd.thrust = shapeThrottle(state.throttle, {
-    mode: flightMode,
+    mode: cmd.mode,
     hoverAtCenter: settings.hoverAtCenter,
     throttleExpo: settings.throttleExpo,
     thrustToWeight: preset().thrustToWeight,
@@ -344,7 +358,7 @@ function frame(now) {
   const ground = terrainHeight(quad.pos.x, quad.pos.z);
   hud.update({
     armed: quad.armed,
-    mode: flightMode,
+    mode: cmd.mode,
     camera: rig.mode,
     throttle: state.throttle,
     speed: quad.vel.length(),
