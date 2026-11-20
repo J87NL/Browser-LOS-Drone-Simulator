@@ -1,7 +1,7 @@
 // Bootstrap and main loop.
 import * as THREE from 'three';
 import { SIM, PRESETS, ARM, CAMERA, WORLD, INPUT, DRONE_SIZE_BASE } from './config.js';
-import { loadSettings, saveSettings } from './storage.js';
+import { loadRaceBests, loadSettings, saveRaceBests, saveSettings } from './storage.js';
 import { FixedStepper } from './physics/stepper.js';
 import { Quad } from './physics/quad.js';
 import { CollisionWorld } from './physics/colliders.js';
@@ -14,6 +14,8 @@ import { createSky } from './world/sky.js';
 import { createLights } from './world/lights.js';
 import { createTrees } from './world/trees.js';
 import { createCourse, PAD } from './world/course.js';
+import { createGhostModel, createRaceCourse } from './world/race-course.js';
+import { RACE_GATES, createGhostRecorder, createRace, ghostPose } from './race/race.js';
 import { createCameraDroneModel } from './drone/camera-drone.js';
 import { createDroneModel, modelLift } from './drone/model.js';
 import { CameraRig, CAMERA_LABELS } from './cameras.js';
@@ -71,7 +73,14 @@ createDistantLand(scene);
 
 const collision = new CollisionWorld(terrainHeight);
 const course = createCourse(scene, collision);
-const trees = createTrees(scene, collision, course.keepOut);
+const raceCourse = createRaceCourse(scene, collision);
+const trees = createTrees(scene, collision, [...course.keepOut, ...raceCourse.keepOut]);
+const race = createRace(RACE_GATES, terrainHeight);
+const ghostRecorder = createGhostRecorder();
+const ghost = createGhostModel();
+scene.add(ghost);
+const raceBests = loadRaceBests();
+const lastRacePos = new THREE.Vector3();
 
 const droneModels = new Map();
 let drone = null;
@@ -187,9 +196,52 @@ function applySettings(key) {
 
 function resetDrone() {
   quad.reset(padSpawn());
+  race.reset();
+  lastRacePos.copy(quad.pos);
   stepper.reset();
   keyboard.throttle = 0;
   keyboard.usedThrottle = false;
+}
+
+const formatSeconds = (seconds) => `${seconds.toFixed(1)} s`;
+
+function updateRace(dt) {
+  for (const event of race.update(dt, lastRacePos, quad.pos, !!quad.crashed)) {
+    if (event.type === 'start') {
+      ghostRecorder.start();
+      toasts.show('Race started: fly the gates in order', 2000);
+    }
+    if (event.type === 'crash') toasts.show(`Race over: crashed (${event.points} points)`, 3000);
+    if (event.type === 'lap') finishLap(event);
+  }
+  lastRacePos.copy(quad.pos);
+  const { running, next, time, lapStart, points } = race.state;
+  if (running) ghostRecorder.sample(dt, quad.pos, quad.heading);
+  const best = raceBests[settings.preset];
+  const pose = running && best ? ghostPose(best.ghost, time - lapStart) : null;
+  ghost.visible = !!pose;
+  if (pose) {
+    ghost.position.set(pose.x, pose.y, pose.z);
+    ghost.rotation.set(0, pose.heading, 0);
+    ghost.scale.setScalar(preset().modelScale * drawSize());
+  }
+  raceCourse.update(elapsed, running ? next : 0);
+  const start = RACE_GATES[0];
+  const nearStart = Math.hypot(quad.pos.x - start.x, quad.pos.z - start.z) < 35;
+  const bestText = best ? ` · best ${formatSeconds(best.lap)}` : '';
+  if (running) hud.setChallenge(`RACE gate ${next === 0 ? 'FINISH' : `${next}/${race.gateCount - 1}`} · ${formatSeconds(time - lapStart)} · ${points} pts${bestText}`);
+  else hud.setChallenge(nearStart ? `RACE fly through START to begin${bestText}` : '');
+}
+
+function finishLap(event) {
+  const best = raceBests[settings.preset];
+  const record = !best || event.lapSeconds < best.lap;
+  toasts.show(`Lap ${formatSeconds(event.lapSeconds)} · ${event.points} points${record ? ' · new best!' : ''}`, 3500);
+  if (record) {
+    raceBests[settings.preset] = { lap: +event.lapSeconds.toFixed(2), points: event.points, ghost: [...ghostRecorder.samples] };
+    saveRaceBests(raceBests);
+  }
+  ghostRecorder.start();
 }
 
 function tryArm(rawThrottle, maxThrottle = ARM.maxThrottle) {
@@ -333,6 +385,7 @@ function frame(now) {
     }));
   }
   quad.renderPose(alpha, renderPos, renderQuat);
+  if (!paused) updateRace(dt);
 
   // Visuals
   // Visual size setting: scale the model and lift it so its feet sit on the

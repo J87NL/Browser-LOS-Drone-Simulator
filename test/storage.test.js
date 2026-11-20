@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mergeSettings, readJSON, writeJSON } from '../src/storage.js';
+import { loadRaceBests, mergeSettings, readJSON, writeJSON } from '../src/storage.js';
 import { DEFAULT_SETTINGS } from '../src/config.js';
 
 describe('settings storage', () => {
@@ -53,5 +53,19 @@ describe('settings storage', () => {
     const st = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
     writeJSON('k', { a: 1 }, st);
     expect(readJSON('k', st)).toEqual({ a: 1 });
+  });
+
+  it('loads race bests per known preset and drops broken entries', () => {
+    const raw = JSON.stringify({
+      freestyle5: { lap: 31.2, points: 900, ghost: [1, 2, 3, 0] },
+      whoop: { lap: 'fast', points: 1 },
+      camera: { lap: 50, points: 400, ghost: [1, 'x'] },
+      __proto__: { lap: 1, points: 1 },
+      nope: { lap: 1, points: 1 },
+    });
+    const bests = loadRaceBests({ getItem: () => raw });
+    expect(Object.keys(bests).sort()).toEqual(['camera', 'freestyle5']);
+    expect(bests.freestyle5.ghost).toEqual([1, 2, 3, 0]);
+    expect(bests.camera.ghost).toEqual([]);
   });
 });

@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS, DRONE_SIZE_BASE, PRESETS, SETTING_RANGES as RANGES } 
 
 const SETTINGS_KEY = 'fpvsim.settings.v1';
 const MAPPINGS_KEY = 'fpvsim.mappings.v1';
+const RACE_KEY = 'fpvsim.race.v1';
 
 export function readJSON(key, storage = globalThis.localStorage) {
   try {
@@ -68,6 +69,24 @@ export function loadSettings() {
 
 export function saveSettings(s) {
   return writeJSON(SETTINGS_KEY, s);
+}
+
+/** Best lap per preset: { [preset]: { lap, points, ghost } }, invalid entries dropped. */
+export function loadRaceBests(storage = globalThis.localStorage) {
+  const stored = readJSON(RACE_KEY, storage);
+  const bests = Object.create(null);
+  if (!isObj(stored)) return bests;
+  for (const [preset, best] of Object.entries(stored)) {
+    if (!Object.hasOwn(PRESETS, preset) || !isObj(best)) continue;
+    if (!Number.isFinite(best.lap) || !Number.isFinite(best.points)) continue;
+    const ghost = Array.isArray(best.ghost) && best.ghost.every(Number.isFinite) ? best.ghost : [];
+    bests[preset] = { lap: best.lap, points: best.points, ghost };
+  }
+  return bests;
+}
+
+export function saveRaceBests(bests, storage = globalThis.localStorage) {
+  return writeJSON(RACE_KEY, bests, storage);
 }
 
 export function loadMappings() {

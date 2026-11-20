@@ -32,6 +32,7 @@ export class Hud {
         h('span', { class: 'hud-label', text: 'WIND' }),
         (this.windArrow = h('span', { class: 'wind-arrow', text: '↑', 'aria-hidden': 'true' })),
         (this.windText = h('span', { class: 'hud-num' })))),
+      (this.challenge = h('div', { class: 'hud-row hud-challenge hidden' })),
       this.source,
       this.hint,
     );
@@ -50,6 +51,12 @@ export class Hud {
     this._last[key] = text;
     el.textContent = text;
     if (cls !== undefined) el.dataset.state = cls;
+  }
+
+  /** One line for the race or an exercise; empty hides it. */
+  setChallenge(text) {
+    this._set(this.challenge, 'challenge', text);
+    this.challenge.classList.toggle('hidden', !text);
   }
 
   update({ armed, mode, camera, throttle, speed, altitude, crashed, source, hint = '', paused, armProgress = 0, sticksLocked = false, wind = null }) {

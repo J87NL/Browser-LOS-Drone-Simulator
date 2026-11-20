@@ -76,6 +76,15 @@ optional peer dependencies.
   rate (centre holds the height). Let go and the drone brakes and holds its position, also in wind.
   The acro position of the flight mode switch flies these drones in plain angle mode.
 
+### Race course
+
+Ahead and to the right of the pilot is a race course: a START / FINISH gate, six numbered gates (one
+of them high up) and cones along the line. Fly through START to begin. The next gate lights up
+yellow; gates only count in order and in the right direction. Each gate is worth 100 points, a lap
+200 plus 20 points per second under the 45 s par. A crash ends the run and costs 150 points. The
+best lap per preset is kept in the browser, and from then on a see-through ghost flies that lap
+alongside you.
+
 ### Cameras
 
 - **LOS** (default): you stand 1.7 m tall a few metres behind the pad and look at the quad.
@@ -280,8 +289,11 @@ src/
   physics/             quad.js (dynamics), rates.js, controls.js, stepper.js, colliders.js
   input/               gamepad.js (polling, storage), mapping.js (pure mapping logic), keyboard.js, input.js,
                        gesture.js (stick command arming)
-  world/               terrain, distant hills, sky, lights, trees, course (pad, gates, poles, flags, tower)
+  world/               terrain, distant hills, sky, lights, trees, grass (photo quality), course (pad,
+                       gates, poles, flags, tower), race-course (numbered gates, cones, ghost)
+  race/race.js         gate crossing, lap timing, points, ghost recording (pure logic)
   drone/model.js       procedural quad (carbon frame, motors, props, battery, camera), prop animation, LEDs
+  drone/camera-drone.js  procedural GPS camera drone (shell, landing skids, gimbal)
   ui/                  HUD, settings, calibration screen + stick guide, toasts, LOS marker, debug overlay
 test/                  Vitest unit tests
 ```
