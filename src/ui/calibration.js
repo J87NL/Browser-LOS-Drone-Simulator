@@ -61,6 +61,7 @@ export class CalibrationScreen {
     if (opened && !this.gamepads.hasMapping(opened.id)) this.gamepads.setMapping(opened.id, this.gamepads.getMapping(opened));
     this.openedFor = null;
     this.el.classList.add('hidden');
+    document.activeElement?.blur?.();
     this.cb.onClose?.();
   }
 
