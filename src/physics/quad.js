@@ -4,7 +4,7 @@
 //   pitch down  = negative rotation about body +X (stick forward)
 //   yaw right   = negative rotation about body +Y
 import { Vector3, Quaternion } from 'three';
-import { GRAVITY, CONTACT, ANGLE_MODE, MOTOR, PROBES } from '../config.js';
+import { GRAVITY, CONTACT, ANGLE_MODE, GPS, MOTOR, PROBES } from '../config.js';
 import { actualRateRad } from './rates.js';
 
 const UP = new Vector3(0, 1, 0);
@@ -29,6 +29,9 @@ const _gn = new Vector3();
 const _wW = new Vector3();
 const _vP = new Vector3();
 const _tmp = new Vector3();
+const _gpsForce = new Vector3();
+const deadband = (value) => (Math.abs(value) < GPS.stickDeadband ? 0 : value);
+const _vTarget = new Vector3();
 
 export class Quad {
   constructor(params) {
@@ -48,6 +51,8 @@ export class Quad {
     this.grounded = false;
     this.lastImpact = 0;
     this.wind = new Vector3(); // m/s, world frame; set by the caller
+    this.gpsIntegral = new Vector3();
+    this.gpsHold = null;
     this.drawScale = 1;
     this.setDrawScale(1);
   }
@@ -98,6 +103,8 @@ export class Quad {
     this.prevQuat.copy(this.quat);
     this.heading = heading;
     this.thrust = 0;
+    this.gpsIntegral.set(0, 0, 0);
+    this.gpsHold = null;
     this.motor = 0;
     this.armed = false;
     this.crashed = null;
@@ -111,8 +118,8 @@ export class Quad {
   /**
    * Advance the simulation by dt.
    * @param {number} dt
-   * @param {{thrust:number, roll:number, pitch:number, yaw:number, mode:'angle'|'acro', rates:object, angleMaxTilt?:number}} cmd
-   *   thrust is the shaped 0..1 thrust fraction, sticks are -1..1.
+   * @param {{thrust:number, roll:number, pitch:number, yaw:number, mode:'angle'|'acro'|'gps', rates:object, angleMaxTilt?:number, climb?:number}} cmd
+   *   thrust is the shaped 0..1 thrust fraction, sticks are -1..1, climb is the -1..1 throttle stick in GPS mode.
    * @param {import('./colliders.js').CollisionWorld} [world]
    */
   step(dt, cmd, world) {
@@ -127,9 +134,13 @@ export class Quad {
     const t = this.targetRates;
     // Like a real quad without air mode: sitting on the ground with less
     // thrust than it takes to lift off, the sticks do not spin it.
-    const idleOnGround = this.grounded && cmd.thrust * p.thrustToWeight < CONTACT.groundIdleLift;
+    const gps = cmd.mode === 'gps';
+    const thrustCommand = gps ? this._gpsThrust(cmd, dt) : cmd.thrust;
+    const idleOnGround = this.grounded && thrustCommand * p.thrustToWeight < CONTACT.groundIdleLift;
     if (this.armed && idleOnGround) {
       t.set(0, 0, 0);
+      this.gpsIntegral.set(0, 0, 0);
+      this.gpsHold = null;
       this.omega.multiplyScalar(Math.exp(-dt * CONTACT.groundSpinDamping));
     } else if (this.armed) {
       if (cmd.mode === 'acro') {
@@ -138,6 +149,9 @@ export class Quad {
           -actualRateRad(cmd.yaw, cmd.rates.yaw),
           -actualRateRad(cmd.roll, cmd.rates.roll),
         );
+      } else if (gps) {
+        _upDes.copy(_gpsForce).normalize();
+        this._steerUpTo(cmd, t);
       } else {
         this._angleModeTargets(cmd, t);
       }
@@ -149,7 +163,7 @@ export class Quad {
     }
 
     // --- Thrust with motor lag -----------------------------------------
-    const desired = this.armed ? Math.min(1, Math.max(0, cmd.thrust)) * this.maxThrust : 0;
+    const desired = this.armed ? Math.min(1, Math.max(0, thrustCommand)) * this.maxThrust : 0;
     this.thrust += (desired - this.thrust) * (1 - Math.exp(-dt / p.motorTau));
     const idle = this.armed ? MOTOR.idle : 0;
     const motorTarget = Math.max(idle, this.thrust / this.maxThrust);
@@ -204,6 +218,49 @@ export class Quad {
     }
   }
 
+  _gpsThrust(cmd, dt) {
+    const p = this.params;
+    const pitch = deadband(cmd.pitch);
+    const roll = deadband(cmd.roll);
+    const climb = deadband(cmd.climb ?? 0);
+    const h = this.heading;
+    _vTarget.set(
+      -Math.sin(h) * pitch * GPS.maxSpeed + Math.cos(h) * roll * GPS.maxSpeed,
+      climb * (climb > 0 ? GPS.climbRate : GPS.descentRate),
+      -Math.cos(h) * pitch * GPS.maxSpeed - Math.sin(h) * roll * GPS.maxSpeed,
+    );
+    const centred = pitch === 0 && roll === 0;
+    if (!centred) this.gpsHold = null;
+    if (centred && !this.gpsHold && Math.hypot(this.vel.x, this.vel.z) < 1) this.gpsHold = this.pos.clone();
+    if (this.gpsHold) {
+      _vTarget.x += (this.gpsHold.x - this.pos.x) * GPS.positionGain;
+      _vTarget.z += (this.gpsHold.z - this.pos.z) * GPS.positionGain;
+    }
+
+    _tmp.set(_vTarget.x - this.vel.x, 0, _vTarget.z - this.vel.z);
+    this.gpsIntegral.addScaledVector(_tmp, GPS.integralGain * dt);
+    const i = this.gpsIntegral.length();
+    if (i > GPS.integralLimit) this.gpsIntegral.multiplyScalar(GPS.integralLimit / i);
+
+    _vRel.copy(this.vel).sub(this.wind).setY(0);
+    const air = _vRel.length();
+    _gpsForce.copy(_tmp).multiplyScalar(GPS.velocityGain).add(this.gpsIntegral).multiplyScalar(p.mass);
+    _gpsForce.addScaledVector(_vRel, p.dragLinH + p.dragQuadH * air);
+    const maxTilt = ((cmd.angleMaxTilt ?? p.angleMaxTilt) * Math.PI) / 180;
+    const vz = this.vel.y - this.wind.y;
+    const verticalDrag = p.dragLinV * vz + p.dragQuadV * Math.abs(vz) * vz;
+    const vertical = p.mass * (GRAVITY + (_vTarget.y - this.vel.y) * GPS.verticalGain) + verticalDrag;
+    const lift = Math.max(p.mass * GRAVITY * 0.3, vertical);
+    const horizontal = Math.hypot(_gpsForce.x, _gpsForce.z);
+    const maxHorizontal = lift * Math.tan(maxTilt);
+    if (horizontal > maxHorizontal) _gpsForce.multiplyScalar(maxHorizontal / horizontal);
+    _gpsForce.y = lift;
+
+    if (this.grounded && climb <= 0) return 0;
+    const thrust = Math.max(0, _gpsForce.dot(this.up(_up)));
+    return thrust / this.maxThrust;
+  }
+
   _angleModeTargets(cmd, t) {
     const p = this.params;
     const maxTilt = ((cmd.angleMaxTilt ?? p.angleMaxTilt) * Math.PI) / 180;
@@ -217,7 +274,11 @@ export class Quad {
     _qYaw.setFromAxisAngle(UP, this.heading);
     _qDes.premultiply(_qYaw);
     _upDes.copy(UP).applyQuaternion(_qDes);
+    this._steerUpTo(cmd, t);
+  }
 
+  _steerUpTo(cmd, t) {
+    const p = this.params;
     const up = this.up(_up);
     _axis.crossVectors(up, _upDes);
     const s = _axis.length();

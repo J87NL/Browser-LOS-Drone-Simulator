@@ -8,6 +8,7 @@
   --bad: #ff4d5e;
   --acro: #ffb020;
   --angle: #4cc3ff;
+  --gps: #6ee07a;
   --warn: #ffb347;
   --font: system-ui, -apple-system, 'Segoe UI', Ubuntu, Roboto, sans-serif;
   --mono: ui-monospace, 'SFMono-Regular', 'Ubuntu Mono', Menlo, monospace;
@@ -39,6 +40,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #c8d8e6; col
 .hud-pill[data-state='off'] { background: rgba(255, 255, 255, 0.16); color: var(--muted); }
 .hud-pill[data-state='acro'] { background: var(--acro); color: #1a1205; text-shadow: none; }
 .hud-pill[data-state='angle'] { background: var(--angle); color: #04131c; text-shadow: none; }
+.hud-pill[data-state='gps'] { background: var(--gps); color: #06170a; text-shadow: none; }
 .hud-label { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; }
 .hud-num { font: 600 15px/1 var(--mono); min-width: 70px; }
 .thr-bar { flex: 1; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.16); overflow: hidden; }

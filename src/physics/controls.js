@@ -2,6 +2,22 @@
 import { throttleCurve, hoverMappedStick } from './rates.js';
 
 /**
+ * @param {'angle'|'acro'} mode
+ * @param {{gps?: boolean}} preset
+ * @returns {'angle'|'acro'|'gps'}
+ */
+export function effectiveFlightMode(mode, preset) {
+  if (!preset.gps) return mode;
+  return mode === 'angle' ? 'gps' : 'angle';
+}
+
+export function gpsClimb(rawThrottle) {
+  return Math.min(1, Math.max(-1, (rawThrottle - 0.5) * 2));
+}
+
+export const FLIGHT_MODE_LABELS = { angle: 'ANGLE', acro: 'ACRO', gps: 'GPS' };
+
+/**
  * @param {number} rawThrottle 0..1 stick position after calibration
  * @param {object} o
  * @param {'angle'|'acro'} o.mode

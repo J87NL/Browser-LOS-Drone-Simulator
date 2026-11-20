@@ -142,7 +142,7 @@ export class SettingsPanel {
             this._num('FPV camera uptilt', 'fpvUptilt', { min: R.fpvUptilt[0], max: R.fpvUptilt[1], step: 1, unit: '°' }, () => s.fpvUptilt, (v) => (s.fpvUptilt = v)),
             this._num('FPV field of view', 'fpvFov', { min: R.fpvFov[0], max: R.fpvFov[1], step: 1, unit: '° horiz.' }, () => s.fpvFov, (v) => (s.fpvFov = v)),
             this._check('FPV: front props in view', 'fpvPropsInView'),
-            this._num('Drone size (drawing and collisions)', 'droneSize', { min: R.droneSize[0], max: R.droneSize[1], step: 0.25, unit: '×' }, () => s.droneSize, (v) => (s.droneSize = v)),
+            this._num('Drone size (drawing and collisions)', 'droneScale', { min: R.droneScale[0], max: R.droneScale[1], step: 0.1, unit: '×' }, () => s.droneScale, (v) => (s.droneScale = v)),
             this._check('LOS auto-zoom', 'losAutoZoom'),
             this._check('LOS marker when far or off-screen', 'losMarker'),
             h('h3', { text: 'Graphics & sound' }),

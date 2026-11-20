@@ -1,11 +1,11 @@
 // Bootstrap and main loop.
 import * as THREE from 'three';
-import { SIM, PRESETS, ARM, CAMERA, WORLD, INPUT } from './config.js';
-import { loadSettings, saveSettings } from './storage.js';
+import { SIM, PRESETS, ARM, CAMERA, WORLD, INPUT, DRONE_SIZE_BASE } from './config.js';
+import { loadExerciseBests, loadRaceBests, loadSettings, saveExerciseBests, saveRaceBests, saveSettings } from './storage.js';
 import { FixedStepper } from './physics/stepper.js';
 import { Quad } from './physics/quad.js';
 import { CollisionWorld } from './physics/colliders.js';
-import { shapeThrottle } from './physics/controls.js';
+import { FLIGHT_MODE_LABELS, effectiveFlightMode, gpsClimb, shapeThrottle } from './physics/controls.js';
 import { windAt } from './physics/wind.js';
 import { terrainHeight } from './world/terrain-height.js';
 import { createTerrain } from './world/terrain.js';
@@ -14,6 +14,11 @@ import { createSky } from './world/sky.js';
 import { createLights } from './world/lights.js';
 import { createTrees } from './world/trees.js';
 import { createCourse, PAD } from './world/course.js';
+import { createGhostModel, createRaceCourse } from './world/race-course.js';
+import { RACE_GATES, createGhostRecorder, createRace, ghostPose } from './race/race.js';
+import { createEightExercise, createHoverExercise, createLandingExercise } from './race/exercises.js';
+import { createExerciseArea } from './world/exercise-area.js';
+import { createCameraDroneModel } from './drone/camera-drone.js';
 import { createDroneModel, modelLift } from './drone/model.js';
 import { CameraRig, CAMERA_LABELS } from './cameras.js';
 import { GamepadManager } from './input/gamepad.js';
@@ -70,13 +75,37 @@ createDistantLand(scene);
 
 const collision = new CollisionWorld(terrainHeight);
 const course = createCourse(scene, collision);
-const trees = createTrees(scene, collision, course.keepOut);
+const raceCourse = createRaceCourse(scene, collision);
+const trees = createTrees(scene, collision, [...course.keepOut, ...raceCourse.keepOut]);
+const race = createRace(RACE_GATES, terrainHeight);
+const ghostRecorder = createGhostRecorder();
+const ghost = createGhostModel();
+scene.add(ghost);
+const raceBests = loadRaceBests();
+const exerciseArea = createExerciseArea(scene, collision);
+const hoverExercise = createHoverExercise();
+const landingExercise = createLandingExercise();
+const eightExercise = createEightExercise(terrainHeight);
+const exerciseBests = loadExerciseBests();
+const lastRacePos = new THREE.Vector3();
 
-const drone = createDroneModel();
-scene.add(drone.root);
+const droneModels = new Map();
+let drone = null;
 
 // --- Simulation -------------------------------------------------------------------
 const preset = () => PRESETS[settings.preset];
+const drawSize = () => settings.droneScale * DRONE_SIZE_BASE;
+function useDroneModel() {
+  const p = preset();
+  const key = p.model === 'camera' ? `camera:${p.shell}` : 'fpv';
+  if (!droneModels.has(key)) droneModels.set(key, p.model === 'camera' ? createCameraDroneModel({ shell: p.shell }) : createDroneModel());
+  const next = droneModels.get(key);
+  if (drone === next) return;
+  if (drone) scene.remove(drone.root);
+  drone = next;
+  scene.add(drone.root);
+}
+useDroneModel();
 const quad = new Quad(preset());
 const stepper = new FixedStepper(SIM.physicsHz, SIM.maxFrameDt);
 const padSpawn = () => new THREE.Vector3(PAD.x, PAD.top + preset().radius + 0.001, PAD.z);
@@ -142,8 +171,9 @@ let photoRequest = 0;
 
 function applySettings(key) {
   const all = key === 'all' || key === 'init';
-  if (all || key === 'preset' || key === 'droneSize') quad.setDrawScale(settings.droneSize);
+  if (all || key === 'preset' || key === 'droneScale') quad.setDrawScale(drawSize());
   if (all || key === 'preset') {
+    useDroneModel();
     quad.setParams(preset());
     resetDrone();
   }
@@ -173,9 +203,108 @@ function applySettings(key) {
 
 function resetDrone() {
   quad.reset(padSpawn());
+  race.reset();
+  eightExercise.reset();
+  hoverExercise.reset();
+  landingExercise.reset();
+  lastRacePos.copy(quad.pos);
   stepper.reset();
   keyboard.throttle = 0;
   keyboard.usedThrottle = false;
+}
+
+const formatSeconds = (seconds) => `${seconds.toFixed(1)} s`;
+
+function exerciseBest(field) {
+  return exerciseBests[settings.preset]?.[field];
+}
+
+function recordExercise(field, value, better) {
+  const current = exerciseBest(field);
+  if (!Number.isFinite(current) || better(value, current)) {
+    exerciseBests[settings.preset] = { ...exerciseBests[settings.preset], [field]: +value.toFixed(2) };
+    saveExerciseBests(exerciseBests);
+    return true;
+  }
+  return false;
+}
+
+function updateExercises(dt) {
+  const ground = terrainHeight(quad.pos.x, quad.pos.z);
+  const flying = {
+    pos: quad.pos, vel: quad.vel, heading: quad.heading, pilot: rig.pilot, armed: quad.armed,
+    crashed: !!quad.crashed, grounded: quad.grounded, ground, from: lastRacePos, to: quad.pos,
+  };
+  const hover = hoverExercise.update(dt, flying);
+  if (hover && hover.seconds >= 1) {
+    const record = recordExercise('hover', hover.seconds, (a, b) => a > b);
+    toasts.show(`Nose-in hover ${formatSeconds(hover.seconds)}${record ? ' · new best!' : ''}`, 2500);
+  }
+  const landed = landingExercise.update(dt, flying);
+  if (landed) {
+    const record = landed.points > 0 && recordExercise('landing', landed.points, (a, b) => a > b);
+    toasts.show(`Landing ${landed.distance.toFixed(2)} m from the centre: ${landed.points} points${record ? ' · new best!' : ''}`, 3000);
+  }
+  const eight = eightExercise.update(dt, flying);
+  if (eight) {
+    const record = recordExercise('eight', eight.seconds, (a, b) => a < b);
+    toasts.show(`Figure eight in ${formatSeconds(eight.seconds)}${record ? ' · new best!' : ''}`, 2500);
+  }
+  const { inside, noseIn, streak } = hoverExercise.state;
+  exerciseArea.update(inside && noseIn);
+
+  const best = (field, format) => (Number.isFinite(exerciseBest(field)) ? ` · best ${format(exerciseBest(field))}` : '');
+  if (hoverExercise.active(quad.pos)) {
+    const hint = inside && !noseIn ? ' · turn the nose to you' : '';
+    return `NOSE-IN HOVER ${formatSeconds(streak)}${hint}${best('hover', formatSeconds)}`;
+  }
+  if (landingExercise.active(quad.pos)) return `PRECISION LANDING lift off and land on the target${best('landing', (p) => `${p} pts`)}`;
+  if (eightExercise.active(quad.pos)) {
+    const { started, time, next } = eightExercise.state;
+    const step = ['through the middle (away from you)', 'round the right pole', 'through the middle', 'round the left pole'][next];
+    return `FIGURE 8 ${started ? formatSeconds(time) : ''} next: ${step}${best('eight', formatSeconds)}`;
+  }
+  return '';
+}
+
+function updateRace(dt) {
+  const exerciseText = updateExercises(dt);
+  for (const event of race.update(dt, lastRacePos, quad.pos, !!quad.crashed)) {
+    if (event.type === 'start') {
+      ghostRecorder.start();
+      toasts.show('Race started: fly the gates in order', 2000);
+    }
+    if (event.type === 'crash') toasts.show(`Race over: crashed (${event.points} points)`, 3000);
+    if (event.type === 'lap') finishLap(event);
+  }
+  lastRacePos.copy(quad.pos);
+  const { running, next, time, lapStart, points } = race.state;
+  if (running) ghostRecorder.sample(dt, quad.pos, quad.heading);
+  const best = raceBests[settings.preset];
+  const pose = running && best ? ghostPose(best.ghost, time - lapStart) : null;
+  ghost.visible = !!pose;
+  if (pose) {
+    ghost.position.set(pose.x, pose.y, pose.z);
+    ghost.rotation.set(0, pose.heading, 0);
+    ghost.scale.setScalar(preset().modelScale * drawSize());
+  }
+  raceCourse.update(elapsed, running ? next : 0);
+  const start = RACE_GATES[0];
+  const nearStart = Math.hypot(quad.pos.x - start.x, quad.pos.z - start.z) < 35;
+  const bestText = best ? ` · best ${formatSeconds(best.lap)}` : '';
+  if (running) hud.setChallenge(`RACE gate ${next === 0 ? 'FINISH' : `${next}/${race.gateCount - 1}`} · ${formatSeconds(time - lapStart)} · ${points} pts${bestText}`);
+  else hud.setChallenge(exerciseText || (nearStart ? `RACE fly through START to begin${bestText}` : ''));
+}
+
+function finishLap(event) {
+  const best = raceBests[settings.preset];
+  const record = !best || event.lapSeconds < best.lap;
+  toasts.show(`Lap ${formatSeconds(event.lapSeconds)} · ${event.points} points${record ? ' · new best!' : ''}`, 3500);
+  if (record) {
+    raceBests[settings.preset] = { lap: +event.lapSeconds.toFixed(2), points: event.points, ghost: [...ghostRecorder.samples] };
+    saveRaceBests(raceBests);
+  }
+  ghostRecorder.start();
 }
 
 function tryArm(rawThrottle, maxThrottle = ARM.maxThrottle) {
@@ -206,12 +335,12 @@ function handleEvent(ev, state) {
       break;
     case 'flightModeToggle':
       flightMode = flightMode === 'angle' ? 'acro' : 'angle';
-      toasts.show(`Flight mode: ${flightMode.toUpperCase()}`, 1200);
+      toasts.show(`Flight mode: ${FLIGHT_MODE_LABELS[effectiveFlightMode(flightMode, preset())]}`, 1200);
       break;
     case 'acro':
     case 'angle':
       flightMode = ev;
-      toasts.show(`Flight mode: ${flightMode.toUpperCase()}`, 1200);
+      toasts.show(`Flight mode: ${FLIGHT_MODE_LABELS[effectiveFlightMode(flightMode, preset())]}`, 1200);
       break;
     case 'reset':
       resetDrone();
@@ -241,8 +370,7 @@ function resize() {
   camera.updateProjectionMatrix();
   renderer.setPixelRatio(pr);
   renderer.setSize(innerWidth, innerHeight);
-  // Photo quality renders AO at up to 1.5x pixel ratio to keep it affordable.
-  photo?.setSize(innerWidth, innerHeight, Math.min(pr, 1.5));
+  photo?.setSize(innerWidth, innerHeight, Math.min(pr, 1));
 }
 window.addEventListener('resize', resize);
 function watchPixelRatio() {
@@ -296,7 +424,8 @@ function frame(now) {
   }
   calibration.update();
 
-  cmd.mode = flightMode;
+  cmd.mode = effectiveFlightMode(flightMode, preset());
+  cmd.climb = gpsClimb(state.throttle);
   cmd.rates = settings.rates;
   cmd.angleMaxTilt = settings.angleMaxTilt;
   const locked = armGesture.sticksLocked;
@@ -304,7 +433,7 @@ function frame(now) {
   cmd.pitch = locked ? 0 : state.pitch;
   cmd.yaw = locked ? 0 : state.yaw;
   cmd.thrust = shapeThrottle(state.throttle, {
-    mode: flightMode,
+    mode: cmd.mode,
     hoverAtCenter: settings.hoverAtCenter,
     throttleExpo: settings.throttleExpo,
     thrustToWeight: preset().thrustToWeight,
@@ -319,16 +448,17 @@ function frame(now) {
     }));
   }
   quad.renderPose(alpha, renderPos, renderQuat);
+  if (!paused) updateRace(dt);
 
   // Visuals
   // Visual size setting: scale the model and lift it so its feet sit on the
   // bottom of the collision sphere (world up, so an upside-down quad does
   // not sink into the ground either).
-  const scale = preset().modelScale * settings.droneSize;
+  const scale = preset().modelScale * drawSize();
   drone.root.scale.setScalar(scale);
   drone.root.quaternion.copy(renderQuat);
   drone.root.position.copy(renderPos);
-  drone.root.position.y += modelLift(preset(), settings.droneSize);
+  drone.root.position.y += modelLift(preset(), drawSize());
   rig.update(dt, renderPos, renderQuat, quad.heading, settings, scale, preset().modelScale, drone.root.position);
   const camDist = camera.position.distanceTo(renderPos);
   drone.update(quad.motor, paused ? 0 : dt, camDist, rig.mode === 'fpv');
@@ -344,7 +474,7 @@ function frame(now) {
   const ground = terrainHeight(quad.pos.x, quad.pos.z);
   hud.update({
     armed: quad.armed,
-    mode: flightMode,
+    mode: cmd.mode,
     camera: rig.mode,
     throttle: state.throttle,
     speed: quad.vel.length(),
@@ -359,7 +489,7 @@ function frame(now) {
   });
   debug.update(dt, { steps, simTime: stepper.time, input: state, thrust: cmd.thrust, quad, pad });
 
-  if (photo?.enabled) photo.render();
+  if (photo?.enabled) photo.render(dt, elapsed, camera.position, quad.wind.length());
   else renderer.render(scene, camera);
 }
 requestAnimationFrame(frame);

@@ -22,10 +22,10 @@ export function modelLift(preset, droneSize) {
   return FEET_DEPTH * preset.modelScale * droneSize - preset.radius;
 }
 
-const FRONT_COLOR = '#ff7a1a';
+export const FRONT_COLOR = '#ff7a1a';
 const REAR_COLOR = '#2b3038';
-const FRONT_LED = new THREE.Color('#2dff7a');
-const REAR_LED = new THREE.Color('#ff2436');
+export const FRONT_LED = new THREE.Color('#2dff7a');
+export const REAR_LED = new THREE.Color('#ff2436');
 
 function canvasTexture(size, draw, { srgb = true, repeat = null } = {}) {
   const c = document.createElement('canvas');
@@ -61,7 +61,7 @@ function carbonTexture() {
   }, { repeat: 1 });
 }
 
-function glowTexture() {
+export function glowTexture() {
   return canvasTexture(64, (g) => {
     const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
     grad.addColorStop(0, 'rgba(255,255,255,1)');
@@ -73,7 +73,7 @@ function glowTexture() {
 }
 
 /** Spinning prop blur: faint near the hub, a denser ring towards the tips. */
-function blurTexture() {
+export function blurTexture() {
   return canvasTexture(128, (g) => {
     const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
     grad.addColorStop(0, 'rgba(255,255,255,0)');

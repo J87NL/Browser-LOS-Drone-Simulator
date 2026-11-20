@@ -1,6 +1,7 @@
 // Minimal HUD: armed state, flight mode, camera, throttle bar, speed, altitude.
 import { h } from './dom.js';
 import { CAMERA_LABELS } from '../cameras.js';
+import { FLIGHT_MODE_LABELS } from '../physics/controls.js';
 
 /** Continue `raw` (degrees) from `last` the short way round, so a CSS rotation never spins 360°. */
 export function unwrapDegrees(last, raw) {
@@ -31,6 +32,7 @@ export class Hud {
         h('span', { class: 'hud-label', text: 'WIND' }),
         (this.windArrow = h('span', { class: 'wind-arrow', text: '↑', 'aria-hidden': 'true' })),
         (this.windText = h('span', { class: 'hud-num' })))),
+      (this.challenge = h('div', { class: 'hud-row hud-challenge hidden' })),
       this.source,
       this.hint,
     );
@@ -51,13 +53,18 @@ export class Hud {
     if (cls !== undefined) el.dataset.state = cls;
   }
 
+  setChallenge(text) {
+    this._set(this.challenge, 'challenge', text);
+    this.challenge.classList.toggle('hidden', !text);
+  }
+
   update({ armed, mode, camera, throttle, speed, altitude, crashed, source, hint = '', paused, armProgress = 0, sticksLocked = false, wind = null }) {
     // While a stick-command hold is in progress, show how far along it is.
     const holding = armProgress > 0 ? ` ${'▮'.repeat(Math.ceil(armProgress * 5)).padEnd(5, '▯')}` : '';
     let label = armProgress > 0 ? (armed ? 'DISARMING' : 'ARMING') + holding : armed ? 'ARMED' : 'DISARMED';
     if (armed && sticksLocked && !(armProgress > 0)) label = 'ARMED · CENTER STICKS';
     this._set(this.armed, 'armed', label, armed ? 'on' : 'off');
-    this._set(this.mode, 'mode', mode === 'acro' ? 'ACRO' : 'ANGLE', mode);
+    this._set(this.mode, 'mode', FLIGHT_MODE_LABELS[mode], mode);
     this._set(this.cam, 'cam', CAMERA_LABELS[camera], camera);
     this.thrFill.style.transform = `scaleX(${throttle.toFixed(3)})`;
     this._set(this.thrText, 'thr', `${Math.round(throttle * 100)}%`);

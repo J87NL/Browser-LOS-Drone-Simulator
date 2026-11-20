@@ -84,6 +84,104 @@ export const PRESETS = {
       yaw: { center: 160, max: 450, expo: 0.0 },
     },
   },
+  longRange7: {
+    label: '7" long range',
+    mass: 0.95,
+    thrustToWeight: 3.2,
+    motorTau: 0.03,
+    rateTau: 0.04,
+    dragLinH: 0.07,
+    dragQuadH: 0.03,
+    dragLinV: 0.3,
+    dragQuadV: 0.07,
+    angleMaxTilt: 50,
+    angleGain: 7,
+    radius: 0.1,
+    crashSpeed: 6.5,
+    obstacleCrashSpeed: 2.8,
+    restitution: 0.2,
+    modelScale: 1.42,
+    rates: {
+      roll: { center: 160, max: 550, expo: 0.15 },
+      pitch: { center: 160, max: 550, expo: 0.15 },
+      yaw: { center: 150, max: 400, expo: 0.1 },
+    },
+  },
+  cinewhoop: {
+    label: '3" cinewhoop',
+    mass: 0.32,
+    thrustToWeight: 3.0,
+    motorTau: 0.025,
+    rateTau: 0.04,
+    dragLinH: 0.06,
+    dragQuadH: 0.03,
+    dragLinV: 0.15,
+    dragQuadV: 0.05,
+    angleMaxTilt: 45,
+    angleGain: 8,
+    radius: 0.06,
+    crashSpeed: 8,
+    obstacleCrashSpeed: 4.5,
+    restitution: 0.3,
+    modelScale: 0.62,
+    rates: {
+      roll: { center: 150, max: 500, expo: 0.15 },
+      pitch: { center: 150, max: 500, expo: 0.15 },
+      yaw: { center: 140, max: 400, expo: 0.1 },
+    },
+  },
+  camera: {
+    label: 'GPS camera drone (Phantom size)',
+    model: 'camera',
+    shell: '#f1f2f0',
+    gps: true,
+    mass: 1.28,
+    thrustToWeight: 2.2,
+    motorTau: 0.06,
+    rateTau: 0.08,
+    dragLinH: 0.06,
+    dragQuadH: 0.03,
+    dragLinV: 0.4,
+    dragQuadV: 0.12,
+    angleMaxTilt: 35,
+    angleGain: 5,
+    radius: 0.12,
+    crashSpeed: 5,
+    obstacleCrashSpeed: 2,
+    restitution: 0.15,
+    modelScale: 1.6,
+    rates: {
+      roll: { center: 90, max: 200, expo: 0.2 },
+      pitch: { center: 90, max: 200, expo: 0.2 },
+      yaw: { center: 90, max: 150, expo: 0.2 },
+    },
+  },
+  mini: {
+    label: 'GPS mini drone (249 g)',
+    model: 'camera',
+    shell: '#8c9196',
+    gps: true,
+    mass: 0.249,
+    thrustToWeight: 2.0,
+    motorTau: 0.04,
+    rateTau: 0.06,
+    dragLinH: 0.015,
+    dragQuadH: 0.006,
+    dragLinV: 0.08,
+    dragQuadV: 0.03,
+    angleMaxTilt: 35,
+    angleGain: 6,
+    radius: 0.06,
+    crashSpeed: 6,
+    obstacleCrashSpeed: 2.5,
+    restitution: 0.2,
+    modelScale: 0.95,
+    rates: {
+      roll: { center: 90, max: 200, expo: 0.2 },
+      pitch: { center: 90, max: 200, expo: 0.2 },
+      yaw: { center: 90, max: 150, expo: 0.2 },
+    },
+  },
 };
 
 export const DEFAULT_PRESET = 'freestyle5';
@@ -115,6 +213,18 @@ export const PROBES = {
   feetDepth: 0.07, // feet below the model origin (see drone/model.js)
   inertiaK: 0.08, // radius of gyration, for the spin a prop strike causes
   spinTransfer: 0.4, // fraction of the rigid-body spin a hit causes (props and frame flex)
+};
+
+export const GPS = {
+  maxSpeed: 15,
+  climbRate: 5,
+  descentRate: 3,
+  velocityGain: 2.2,
+  verticalGain: 3,
+  integralGain: 0.8,
+  integralLimit: 4,
+  positionGain: 0.9,
+  stickDeadband: 0.05,
 };
 
 export const ANGLE_MODE = {
@@ -175,6 +285,8 @@ export const WORLD = {
   seed: 1337,
 };
 
+export const DRONE_SIZE_BASE = 2.5;
+
 export const DEFAULT_SETTINGS = {
   preset: DEFAULT_PRESET,
   rates: structuredClone(DEFAULT_RATES),
@@ -187,7 +299,7 @@ export const DEFAULT_SETTINGS = {
   fpvPropsInView: false,
   losAutoZoom: true,
   losMarker: true,
-  droneSize: 1.5, // drawn size; collisions follow it, flight physics do not
+  droneScale: 1, // drawn size; collisions follow it, flight physics do not
   windSpeed: 0, // m/s, 0 = calm
   windFrom: 90, // degrees clockwise from straight ahead of the pilot: 90 = crosswind from the right
   windGusts: 0.4, // 0 = steady, 1 = very gusty
@@ -204,7 +316,7 @@ export const SETTING_RANGES = {
   fpvUptilt: [-10, 60],
   fpvFov: [60, 150],
   volume: [0, 1],
-  droneSize: [1, 3],
+  droneScale: [0.3, 8],
   windSpeed: [0, 15],
   windFrom: [0, 359],
   windGusts: [0, 1],

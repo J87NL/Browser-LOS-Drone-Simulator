@@ -71,6 +71,31 @@ optional peer dependencies.
   about 3 m/s (scraping along it counts too), or slamming into the ground, the pad or the top of
   something at more than about 7 m/s. Press reset to go back to the pad. A gentle touch or a firm
   landing just bounces. The beginner preset is a bit stricter, the tiny whoop more forgiving.
+- The GPS presets (a camera drone of Phantom size and a 249 g mini) fly like a camera drone: in
+  angle mode (shown as **GPS**) the sticks set a speed (up to 15 m/s) and the throttle stick a climb
+  rate (centre holds the height). Let go and the drone brakes and holds its position, also in wind.
+  The acro position of the flight mode switch flies these drones in plain angle mode.
+
+### Race course
+
+Ahead and to the right of the pilot is a race course: a START / FINISH gate, six numbered gates (one
+of them high up) and cones along the line. Fly through START to begin. The next gate lights up
+yellow; gates only count in order and in the right direction. Each gate is worth 100 points, a lap
+200 plus 20 points per second under the 45 s par. A crash ends the run and costs 150 points. The
+best lap per preset is kept in the browser, and from then on a see-through ghost flies that lap
+alongside you.
+
+### LOS exercises
+
+Near the pad are three exercises. The HUD shows one as soon as you fly close to it, and keeps the
+best result per preset in the browser.
+
+- **Nose-in hover** (blue rings, right of the pad): hover between the two rings (1.5 to 3.5 m up)
+  with the nose towards you. The rings turn green while the time counts.
+- **Precision landing** (target, left of the pad): lift off at least 1 m and land on the target.
+  100 points in the bullseye, 50, 25 and 10 for the outer rings.
+- **Figure eight** (two yellow/black poles ahead): through the middle away from you, round the right
+  pole, through the middle again, round the left pole and back through the middle. Times each eight.
 
 ### Cameras
 
@@ -84,8 +109,9 @@ optional peer dependencies.
   props shows in the lower corners, as on many real builds. That works at low to normal uptilt
   (around 25°); at high uptilt the props drop out of the picture, as they would on a real quad.
 
-The drone is drawn 1.5× its real size by default so it is easier to see in LOS. Settings → "Drone
-size" changes this between 1× and 3×. Flight physics (mass, thrust, drag) keep the real size, but
+Settings → "Drone size" sets how big the drone is drawn, from 0.3× to 8×. At 1× (the default) it is
+drawn 2.5× its real size so it is easier to see in LOS; 0.4× is the real size. A bigger drone is
+handy for practice. Flight physics (mass, thrust, drag) keep the real size, but
 collisions follow the drawn size: spheres at the motors, around the prop discs and at both ends of
 the body make the arms and props of a bigger drone hit the ground and obstacles too, and a hard prop
 strike is a crash. (The sphere at the centre, which the drone rests on, keeps its real size.)
@@ -210,13 +236,14 @@ previous one. The repository needs the `SSH_PRIVATE_KEY` secret of the `deploy` 
 
 Esc opens the settings panel (the sim pauses while it is open):
 
-- Physics preset: Beginner, 5" freestyle, Tiny whoop. Choosing a preset also loads its rates.
+- Physics preset: Beginner, 5" freestyle, Tiny whoop, 7" long range, 3" cinewhoop, GPS camera drone
+  (Phantom size), GPS mini drone (249 g). Choosing a preset also loads its rates.
 - Rates per axis, Betaflight "actual rates" style: center sensitivity, max rate (deg/s) and expo.
   Defaults: roll/pitch 200/670, yaw 200/500.
 - Angle mode max tilt, throttle expo, hover-at-center.
 - Stick command arming on/off.
 - FPV uptilt and FOV, FPV front props in view, LOS auto-zoom on/off, LOS marker on/off.
-- Drone size (drawn size and collisions, 1× to 3×, default 1.5×; flight physics unchanged).
+- Drone size (drawn size and collisions, 0.3× to 8×, default 1× = 2.5× real size; flight physics unchanged).
 - Wind: speed (0 = calm, up to 15 m/s), direction it comes from (0 = in your face, 90 = from the right,
   270 = from the left) and gusts. The HUD shows the wind with an arrow, flags fly downwind and trees
   sway harder. Drag works on the speed relative to the air, so the quad drifts and you have to hold it
@@ -225,7 +252,9 @@ Esc opens the settings panel (the sim pauses while it is open):
 - Photo quality: a real sky (HDRI) that also lights the scene, a photo-scanned grass texture, ambient
   occlusion and sharper, wider sun shadows. The images (CC0, from Poly Haven, about 10 MB) are in
   `static/photo/` and only load when you switch this on; see [docs/photo-assets.md](docs/photo-assets.md).
-  Heavier than the default, and off while Low quality is on.
+  Swaying grass blades grow around the camera on the flying field. Heavier than the default, and off
+  while Low quality is on: it renders at most at pixel ratio 1 and lowers the resolution by itself
+  (down to 60%) when the frame rate drops below about 48 fps.
 - Motor sound volume (off by default).
 
 Everything is saved in `localStorage`. "Reset all settings" restores the defaults (controller
@@ -245,6 +274,8 @@ mappings are kept; reset those per device in the setup screen).
   follows with a first-order response (about 30 ms), standing in for a tuned PID loop.
 - Angle mode: sticks give a target tilt relative to the current heading (a corner stick is capped at
   max tilt too); yaw stays rate based, about the world vertical so turning does not cost tilt.
+- GPS mode: a velocity controller (with integral, drag feed-forward and position hold when the sticks
+  are centred) picks the thrust vector; the attitude then follows it like in angle mode.
 - Collisions: a sphere at the centre plus spheres at the motors, prop rims and body (sized with the
   drawn drone; props flex, so they do not bounce) against the
   heightfield ground, boxes and vertical cylinders (gates, poles, trees, tower). A motor hit also
@@ -270,8 +301,13 @@ src/
   physics/             quad.js (dynamics), rates.js, controls.js, stepper.js, colliders.js
   input/               gamepad.js (polling, storage), mapping.js (pure mapping logic), keyboard.js, input.js,
                        gesture.js (stick command arming)
-  world/               terrain, distant hills, sky, lights, trees, course (pad, gates, poles, flags, tower)
+  world/               terrain, distant hills, sky, lights, trees, grass (photo quality), course (pad,
+                       gates, poles, flags, tower), race-course (numbered gates, cones, ghost),
+                       exercise-area (hover rings, landing target, figure-eight poles)
+  race/race.js         gate crossing, lap timing, points, ghost recording (pure logic)
+  race/exercises.js    nose-in hover, precision landing and figure-eight scoring (pure logic)
   drone/model.js       procedural quad (carbon frame, motors, props, battery, camera), prop animation, LEDs
+  drone/camera-drone.js  procedural GPS camera drone (shell, landing skids, gimbal)
   ui/                  HUD, settings, calibration screen + stick guide, toasts, LOS marker, debug overlay
 test/                  Vitest unit tests
 ```
