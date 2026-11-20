@@ -59,6 +59,9 @@ function getPhoto() {
     photo = createPhotoMode({ renderer, scene, camera, sky, sunDir, lights, terrain });
     resize();
     return photo;
+  }).catch((error) => {
+    photoLoading = null;
+    throw error;
   });
   return photoLoading;
 }
@@ -132,6 +135,9 @@ gamepads.addEventListener('disconnect', (e) => {
   toasts.show(`Controller disconnected${failsafe ? ' (failsafe: disarmed)' : ''}: ${e.detail.id}`, 4000);
 });
 
+const photoWanted = () => settings.photoMode && !settings.lowQuality;
+let photoRequest = 0;
+
 function applySettings(key) {
   const all = key === 'all' || key === 'init';
   if (all || key === 'preset' || key === 'droneSize') quad.setDrawScale(settings.droneSize);
@@ -141,15 +147,17 @@ function applySettings(key) {
   }
   if (all || key === 'lowQuality' || key === 'photoMode') {
     const low = settings.lowQuality;
-    const wantPhoto = settings.photoMode && !low;
-    if (wantPhoto !== !!photo?.enabled && (wantPhoto || photo)) {
-      getPhoto().then((p) => p.setEnabled(wantPhoto)).then((found) => {
-        if (!photo?.enabled || key === 'init') return; // switched off again meanwhile
+    const wantPhoto = photoWanted();
+    const photoChanges = photo ? wantPhoto !== photo.enabled : wantPhoto || !!photoLoading;
+    if (photoChanges) {
+      const request = ++photoRequest;
+      getPhoto().then((p) => p.setEnabled(photoWanted())).then((found) => {
+        if (request !== photoRequest || !photo?.enabled || key === 'init') return; // switched off again meanwhile
         const missing = [!found.sky && 'sky', !found.ground && 'ground texture'].filter(Boolean);
         toasts.show(missing.length
           ? `Photo quality on (ambient occlusion, sharper shadows). Photo ${missing.join(' and ')} not installed: see docs/photo-assets.md`
           : 'Photo quality on', 4000);
-      });
+      }).catch(() => toasts.show('Photo quality could not be loaded', 4000));
     }
     lights.setShadows(!low);
     trees.setShadows(!low);
