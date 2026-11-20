@@ -226,7 +226,9 @@ Esc opens the settings panel (the sim pauses while it is open):
 - Photo quality: a real sky (HDRI) that also lights the scene, a photo-scanned grass texture, ambient
   occlusion and sharper, wider sun shadows. The images (CC0, from Poly Haven, about 10 MB) are in
   `static/photo/` and only load when you switch this on; see [docs/photo-assets.md](docs/photo-assets.md).
-  Heavier than the default, and off while Low quality is on.
+  Swaying grass blades grow around the camera on the flying field. Heavier than the default, and off
+  while Low quality is on: it renders at most at pixel ratio 1 and lowers the resolution by itself
+  (down to 60%) when the frame rate drops below about 48 fps.
 - Motor sound volume (off by default).
 
 Everything is saved in `localStorage`. "Reset all settings" restores the defaults (controller

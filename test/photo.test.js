@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { analyseSky } from '../src/photo.js';
+import { analyseSky, createRenderScaler } from '../src/photo.js';
 
 function sky(w, h, sunX, sunY) {
   const data = new Float32Array(w * h * 4).fill(0.5);
@@ -39,5 +39,33 @@ describe('analyseSky input formats', () => {
     const { sun } = analyseSky({ width: w, height: h, data });
     expect(sun.x).toBeGreaterThan(0.6);
     expect(Math.abs(sun.z)).toBeLessThan(0.1);
+  });
+});
+
+describe('createRenderScaler', () => {
+  const run = (scaler, fps, seconds) => {
+    for (let t = 0; t < seconds; t += 1 / fps) scaler.sample(1 / fps);
+  };
+
+  it('lowers the resolution while frames are slow, down to the minimum', () => {
+    const scaler = createRenderScaler();
+    run(scaler, 30, 1.05);
+    expect(scaler.scale).toBeCloseTo(0.9);
+    run(scaler, 30, 10);
+    expect(scaler.scale).toBe(0.6);
+  });
+
+  it('raises it again when there is headroom, but never above full', () => {
+    const scaler = createRenderScaler();
+    run(scaler, 30, 3.1);
+    run(scaler, 60, 20);
+    expect(scaler.scale).toBe(1);
+  });
+
+  it('keeps the scale between the thresholds', () => {
+    const scaler = createRenderScaler();
+    run(scaler, 30, 1.05);
+    run(scaler, 52, 5);
+    expect(scaler.scale).toBeCloseTo(0.9);
   });
 });

@@ -8,6 +8,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
+import { createGrass } from './world/grass.js';
 
 // Files are served from static/ (copied into the build). See docs/photo-assets.md.
 export const PHOTO_ASSETS = {
@@ -20,6 +21,34 @@ export const PHOTO_ASSETS = {
 
 // Light levels with a real sky. Starting values: tune them to the HDRI you install.
 export const PHOTO_LIGHT = { environment: 0.8, hemi: 0, sun: 1.8 };
+
+export const RENDER_SCALE = { min: 0.6, max: 1, slowFps: 48, fastFps: 58, down: 0.1, up: 0.05, windowSeconds: 1, fastWindowsToRise: 3 };
+
+export function createRenderScaler(limits = RENDER_SCALE) {
+  let frames = 0;
+  let seconds = 0;
+  let fastWindows = 0;
+  return {
+    scale: limits.max,
+    /** @returns {boolean} whether the scale changed */
+    sample(dt) {
+      frames++;
+      seconds += dt;
+      if (seconds < limits.windowSeconds) return false;
+      const fps = frames / seconds;
+      frames = 0;
+      seconds = 0;
+      const previous = this.scale;
+      if (fps < limits.slowFps) this.scale = Math.max(limits.min, this.scale - limits.down);
+      fastWindows = fps > limits.fastFps ? fastWindows + 1 : 0;
+      if (fastWindows >= limits.fastWindowsToRise) {
+        fastWindows = 0;
+        this.scale = Math.min(limits.max, this.scale + limits.up);
+      }
+      return this.scale !== previous;
+    },
+  };
+}
 
 const MIN_SUN_ELEVATION = THREE.MathUtils.degToRad(12);
 const MAX_SKY_WIDTH = 4096;
@@ -40,7 +69,7 @@ function patchGtaoVisibility(gtao) {
     this.scene.traverse((o) => {
       const m = o.material;
       const seeThrough = m && !Array.isArray(m) && ((m.transparent && !m.depthWrite) || m.opacity === 0);
-      if (o.visible && (o.isSprite || seeThrough)) {
+      if (o.visible && (o.isSprite || seeThrough || o.name === 'grass')) {
         o.visible = false;
         this._visibilityCache.push(o);
       }
@@ -99,12 +128,16 @@ export function createPhotoMode({ renderer, scene, camera, sky, sunDir, lights, 
   const composer = new EffectComposer(renderer, target);
   composer.addPass(new RenderPass(scene, camera));
   const gtao = new GTAOPass(scene, camera, 1, 1, undefined, {
-    radius: 0.6, distanceExponent: 1.5, thickness: 1, scale: 1, samples: 12, distanceFallOff: 1, screenSpaceRadius: false,
+    radius: 0.6, distanceExponent: 1.5, thickness: 1, scale: 1, samples: 8, distanceFallOff: 1, screenSpaceRadius: false,
   });
   gtao.blendIntensity = 0.9;
   patchGtaoVisibility(gtao);
   composer.addPass(gtao);
   composer.addPass(new OutputPass());
+  const grass = createGrass();
+  scene.add(grass.mesh);
+  const scaler = createRenderScaler();
+  let basePixelRatio = 1;
 
   const mat = terrain.material;
   const original = {
@@ -196,6 +229,7 @@ export function createPhotoMode({ renderer, scene, camera, sky, sunDir, lights, 
      */
     async setEnabled(on) {
       enabled = on;
+      grass.mesh.visible = on;
       lights.setHighQuality(on);
       if (!on) {
         applyAssets(false, loaded ? await loaded : null);
@@ -206,10 +240,13 @@ export function createPhotoMode({ renderer, scene, camera, sky, sunDir, lights, 
       return { sky: !!a.skyData, ground: !!a.color };
     },
     setSize(width, height, pixelRatio) {
-      composer.setPixelRatio(pixelRatio);
+      basePixelRatio = pixelRatio;
+      composer.setPixelRatio(pixelRatio * scaler.scale);
       composer.setSize(width, height);
     },
-    render() {
+    render(dt, time, centre, windSpeed) {
+      if (scaler.sample(dt)) composer.setPixelRatio(basePixelRatio * scaler.scale);
+      grass.update(time, centre, windSpeed);
       composer.render();
     },
   };

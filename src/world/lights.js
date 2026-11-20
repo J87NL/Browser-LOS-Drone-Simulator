@@ -34,8 +34,8 @@ export function createLights(scene, sunDir) {
     },
     /** Photo quality: a bigger, sharper shadow map over a wider area. */
     setHighQuality(on) {
-      const size = on ? 4096 : 2048;
-      const half = on ? 40 : 28;
+      const size = on ? 3072 : 2048;
+      const half = on ? 36 : 28;
       if (sun.shadow.mapSize.x === size) return;
       sun.shadow.mapSize.set(size, size);
       s.left = s.bottom = -half;

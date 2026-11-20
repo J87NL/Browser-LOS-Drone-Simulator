@@ -242,8 +242,7 @@ function resize() {
   camera.updateProjectionMatrix();
   renderer.setPixelRatio(pr);
   renderer.setSize(innerWidth, innerHeight);
-  // Photo quality renders AO at up to 1.5x pixel ratio to keep it affordable.
-  photo?.setSize(innerWidth, innerHeight, Math.min(pr, 1.5));
+  photo?.setSize(innerWidth, innerHeight, Math.min(pr, 1));
 }
 window.addEventListener('resize', resize);
 function watchPixelRatio() {
@@ -360,7 +359,7 @@ function frame(now) {
   });
   debug.update(dt, { steps, simTime: stepper.time, input: state, thrust: cmd.thrust, quad, pad });
 
-  if (photo?.enabled) photo.render();
+  if (photo?.enabled) photo.render(dt, elapsed, camera.position, quad.wind.length());
   else renderer.render(scene, camera);
 }
 requestAnimationFrame(frame);
