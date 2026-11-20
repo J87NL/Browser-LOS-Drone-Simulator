@@ -243,6 +243,13 @@ function resize() {
   photo?.setSize(innerWidth, innerHeight, Math.min(pr, 1.5));
 }
 window.addEventListener('resize', resize);
+function watchPixelRatio() {
+  matchMedia(`(resolution: ${devicePixelRatio}dppx)`).addEventListener('change', () => {
+    resize();
+    watchPixelRatio();
+  }, { once: true });
+}
+watchPixelRatio();
 
 applySettings('init');
 camera.aspect = innerWidth / innerHeight;
